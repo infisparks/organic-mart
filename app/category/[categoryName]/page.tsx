@@ -212,7 +212,7 @@ export default function CategoryPage() {
                   onClick={() =>
                     setSelectedSub((prev) => (prev === subCat ? "" : subCat))
                   }
-                  className={`px-4 py-2 rounded-full border transition-colors ${
+                  className={`px-4 py-2 rounded-full border transition-colors text-[10px] sm:text-xs ${
                     selectedSub === subCat
                       ? "bg-green-600 text-white border-green-600"
                       : "bg-white text-gray-700 border-gray-300 hover:bg-green-100"
@@ -224,7 +224,7 @@ export default function CategoryPage() {
               {selectedSub && (
                 <button
                   onClick={() => setSelectedSub("")}
-                  className="px-4 py-2 rounded-full border border-gray-300 bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                  className="px-4 py-2 rounded-full border border-gray-300 bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors text-[10px] sm:text-xs"
                 >
                   Clear Filter
                 </button>
@@ -235,7 +235,6 @@ export default function CategoryPage() {
           {filteredProducts.length === 0 ? (
             <p className="text-gray-600">No products found in this category.</p>
           ) : (
-            // Updated grid: Two cards per row on mobile, two on small screens, three on medium, four on large screens.
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {filteredProducts.map((product) => (
                 <Link
@@ -243,7 +242,6 @@ export default function CategoryPage() {
                   href={`/product/${product.id}`}
                   className="bg-white rounded-lg shadow-lg overflow-hidden group relative transition transform hover:-translate-y-1 hover:shadow-2xl"
                 >
-                  {/* Image Section using 1:1 aspect ratio */}
                   <div className="relative aspect-square rounded-t-lg overflow-hidden">
                     <Image
                       src={
@@ -267,7 +265,6 @@ export default function CategoryPage() {
                     )}
                     <FavButton product={product} />
                   </div>
-                  {/* Product Details */}
                   <div className="p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <Image
