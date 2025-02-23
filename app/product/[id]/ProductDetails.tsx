@@ -13,7 +13,7 @@ import {
 import Image from "next/image";
 import AuthPopup from "../../components/AuthPopup";
 import { auth, database } from "../../../lib/firebase";
-import { get, ref as dbRef, set, remove } from "firebase/database";
+import { get, ref as dbRef, set, remove, push } from "firebase/database";
 import { onAuthStateChanged } from "firebase/auth";
 
 type ProductDetailsProps = {
@@ -40,6 +40,10 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
   const [showAuthPopup, setShowAuthPopup] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [inCart, setInCart] = useState(false);
+  const [showDirectBuy, setShowDirectBuy] = useState(false);
+  const [buyerName, setBuyerName] = useState("");
+  const [buyerPhone, setBuyerPhone] = useState("");
+  const [buyerAddress, setBuyerAddress] = useState("");
 
   // Use discountPrice if available; otherwise, fallback to originalPrice.
   const displayPrice = product.discountPrice ?? product.originalPrice;
@@ -159,9 +163,66 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
     }
   };
 
+  // Handle direct buy button click.
+  const handleDirectBuy = () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      setShowAuthPopup(true);
+      return;
+    }
+    setShowDirectBuy(true);
+  };
+
+  // Submit direct buy order with nested structure:
+  // Data is added under aadd/item/0/add
+  const handleDirectBuySubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      setShowAuthPopup(true);
+      return;
+    }
+    if (!buyerName || !buyerPhone || !buyerAddress) {
+      alert("Please fill in all fields");
+      return;
+    }
+    try {
+      const orderRef = dbRef(database, `user/${currentUser.uid}/order`);
+      const newOrderRef = push(orderRef);
+      await set(newOrderRef, {
+       
+          item: {
+            0: {
+              
+                productId: product.id,
+                productName: product.productName,
+                quantity: quantity,
+                price: displayPrice,
+                buyerName,
+                buyerPhone,
+                buyerAddress,
+              },
+              purchaseTime: Date.now(),
+              status : "pending",
+              total : displayPrice
+            },
+          
+        
+      });
+      alert("Order placed successfully!");
+      setShowDirectBuy(false);
+      setBuyerName("");
+      setBuyerPhone("");
+      setBuyerAddress("");
+    } catch (error) {
+      console.error("Error placing order:", error);
+      alert("Could not place order.");
+    }
+  };
+
+  // After a successful auth, try adding product to cart.
   const handleAuthSuccess = () => {
     setShowAuthPopup(false);
-    // After successful login, add the product to cart.
     handleAddToCart();
   };
 
@@ -215,12 +276,16 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
             className="rounded-full"
           />
           <div>
-            <h3 className="font-medium text-gray-900 text-base sm:text-lg">{product.company.name}</h3>
+            <h3 className="font-medium text-gray-900 text-base sm:text-lg">
+              {product.company.name}
+            </h3>
             <div className="flex items-center gap-1 text-yellow-400">
               {[...Array(5)].map((_, i) => (
                 <Star key={i} className="w-4 h-4 fill-current" />
               ))}
-              <span className="text-xs sm:text-sm text-gray-600 ml-1">4.8 (120 reviews)</span>
+              <span className="text-xs sm:text-sm text-gray-600 ml-1">
+                4.8 (120 reviews)
+              </span>
             </div>
           </div>
         </div>
@@ -228,33 +293,50 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
           {product.productName}
         </h1>
-        <p className="text-base sm:text-lg text-gray-600">{product.productDescription}</p>
+        <p className="text-base sm:text-lg text-gray-600">
+          {product.productDescription}
+        </p>
 
         {product.nutrients && product.nutrients.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
             {product.nutrients.map((nutrient) => (
-              <div key={nutrient.name} className="bg-gray-50 p-2 sm:p-4 rounded-xl">
-                <div className="font-semibold text-gray-900 text-sm sm:text-base">{nutrient.value}</div>
-                <div className="text-xs sm:text-sm text-gray-600">{nutrient.name}</div>
+              <div
+                key={nutrient.name}
+                className="bg-gray-50 p-2 sm:p-4 rounded-xl"
+              >
+                <div className="font-semibold text-gray-900 text-sm sm:text-base">
+                  {nutrient.value}
+                </div>
+                <div className="text-xs sm:text-sm text-gray-600">
+                  {nutrient.name}
+                </div>
               </div>
             ))}
           </div>
         )}
 
         <div className="flex items-baseline gap-2 sm:gap-4">
-          <span className="text-2xl sm:text-3xl font-bold text-gray-900">₹{displayPrice}</span>
+          <span className="text-2xl sm:text-3xl font-bold text-gray-900">
+            ₹{displayPrice}
+          </span>
           {product.discountPrice && (
-            <span className="text-lg sm:text-xl text-gray-400 line-through">₹{product.originalPrice}</span>
+            <span className="text-lg sm:text-xl text-gray-400 line-through">
+              ₹{product.originalPrice}
+            </span>
           )}
           {product.discountPrice && (
             <span className="text-green-600 font-medium text-sm sm:text-base">
               Save{" "}
-              {Math.round(((product.originalPrice - displayPrice) / product.originalPrice) * 100)}%
+              {Math.round(
+                ((product.originalPrice - displayPrice) / product.originalPrice) *
+                  100
+              )}
+              %
             </span>
           )}
         </div>
 
-        {/* Single row for quantity control, add-to-cart, and favorite */}
+        {/* Controls: Quantity, Add-to-Cart, Favorite */}
         <div className="flex flex-row items-center gap-3">
           {/* Quantity Control */}
           <div className="flex items-center gap-1 bg-gray-100 rounded-full px-2 py-1">
@@ -296,10 +378,26 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
           <button
             onClick={toggleFavorite}
             className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-full transition-colors ${
-              isFavorite ? "bg-red-500 hover:bg-red-600" : "bg-gray-100 hover:bg-gray-200"
+              isFavorite
+                ? "bg-red-500 hover:bg-red-600"
+                : "bg-gray-100 hover:bg-gray-200"
             }`}
           >
-            <Heart className={`w-5 h-5 ${isFavorite ? "text-white" : "text-gray-600"}`} />
+            <Heart
+              className={`w-5 h-5 ${
+                isFavorite ? "text-white" : "text-gray-600"
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* Direct Buy Button */}
+        <div>
+          <button
+            onClick={handleDirectBuy}
+            className="w-full bg-blue-600 text-white py-2 sm:py-3 rounded-full font-medium hover:bg-blue-700 transition-all duration-300 text-sm sm:text-base text-center"
+          >
+            Buy Now • ₹{displayPrice * quantity}
           </button>
         </div>
 
@@ -324,6 +422,67 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
           onClose={() => setShowAuthPopup(false)}
           onSuccess={handleAuthSuccess}
         />
+      )}
+
+      {/* Direct Buy Modal */}
+      {showDirectBuy && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white p-6 rounded-lg w-11/12 max-w-md">
+            <h2 className="text-xl font-bold mb-4">Enter Shipping Details</h2>
+            <form onSubmit={handleDirectBuySubmit}>
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  value={buyerName}
+                  onChange={(e) => setBuyerName(e.target.value)}
+                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                  required
+                />
+              </div>
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700">
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  value={buyerPhone}
+                  onChange={(e) => setBuyerPhone(e.target.value)}
+                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                  required
+                />
+              </div>
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700">
+                  Address
+                </label>
+                <textarea
+                  value={buyerAddress}
+                  onChange={(e) => setBuyerAddress(e.target.value)}
+                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                  required
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDirectBuy(false)}
+                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Confirm
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
