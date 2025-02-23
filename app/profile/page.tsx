@@ -10,8 +10,31 @@ import { ref, onValue, update } from "firebase/database";
 import { auth, database } from "../../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
+// Define a type for the profile object.
+interface Profile {
+  name?: string;
+  phone?: string;
+  address?: string;
+  lat?: number;
+  lng?: number;
+  photo?: string;
+}
+
+// Define the props for the EditProfileModal component.
+interface EditProfileModalProps {
+  profile: Profile;
+  onClose: () => void;
+  onSave: (updatedProfile: {
+    name: string;
+    phone: string;
+    address: string;
+    lat: number;
+    lng: number;
+  }) => void;
+}
+
 // A simple modal component for editing profile details.
-function EditProfileModal({ profile, onClose, onSave }) {
+function EditProfileModal({ profile, onClose, onSave }: EditProfileModalProps) {
   const [name, setName] = useState(profile?.name || "");
   const [phone, setPhone] = useState(profile?.phone || "");
   const [address, setAddress] = useState(profile?.address || "");
@@ -21,7 +44,6 @@ function EditProfileModal({ profile, onClose, onSave }) {
 
   // Dummy reverse geocode function; in production, replace with an API call.
   const reverseGeocode = async (lat: number, lng: number) => {
-    // For demonstration, we simply return a string combining the coordinates.
     return `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
   };
 
@@ -108,10 +130,10 @@ function EditProfileModal({ profile, onClose, onSave }) {
 }
 
 export default function ProfilePage() {
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const [favCount, setFavCount] = useState(0);
-  const [orderCount, setOrderCount] = useState(0); // Total ordered products (if available)
+  const [orderCount, setOrderCount] = useState(0);
   const [showEditModal, setShowEditModal] = useState(false);
   const router = useRouter();
 
@@ -149,8 +171,7 @@ export default function ProfilePage() {
           }
         });
 
-        // For demonstration, we'll assume orderCount is the same as cartCount.
-        // Replace with your actual order count logic if available.
+        // For demonstration, assume orderCount is the same as cartCount.
         setOrderCount(cartCount);
       } else {
         router.push("/login");
@@ -161,7 +182,13 @@ export default function ProfilePage() {
     };
   }, [cartCount, router]);
 
-  const handleSaveProfile = async (newProfile) => {
+  const handleSaveProfile = async (newProfile: {
+    name: string;
+    phone: string;
+    address: string;
+    lat: number;
+    lng: number;
+  }) => {
     const currentUser = auth.currentUser;
     if (currentUser) {
       const profileRef = ref(database, `user/${currentUser.uid}/profile`);
@@ -181,7 +208,7 @@ export default function ProfilePage() {
               {profile?.photo ? (
                 <Image
                   src={profile.photo}
-                  alt={profile.name}
+                  alt={profile.name ?? "User Photo"}
                   width={80}
                   height={80}
                   className="rounded-full object-cover"
@@ -226,18 +253,16 @@ export default function ProfilePage() {
             <h2 className="text-xl font-bold text-gray-900 mb-4">
               Update Location
             </h2>
-            {/* Display current location */}
             <p className="text-gray-600">
               Latitude: {profile?.lat ? profile.lat.toFixed(4) : "N/A"}, Longitude:{" "}
               {profile?.lng ? profile.lng.toFixed(4) : "N/A"}
             </p>
-            {/* You could add a button here to re-fetch/update location */}
           </div>
         </div>
       </main>
       <Footer />
 
-      {showEditModal && (
+      {showEditModal && profile && (
         <EditProfileModal
           profile={profile}
           onClose={() => setShowEditModal(false)}

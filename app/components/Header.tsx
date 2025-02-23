@@ -88,7 +88,7 @@ export default function Header() {
           <Link href="/search" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
             Shop
           </Link>
-          <Link href="#" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
+          <Link href="/orders" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
             Order
           </Link>
           <Link href="profile" className="text-gray-700 hover:text-green-600 font-medium transition-colors">

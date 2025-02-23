@@ -1,10 +1,12 @@
 "use client";
+
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { onValue, ref as dbRef } from "firebase/database";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, database } from "../../lib/firebase";
-import Link from "next/link";
-
+import { Package, Calendar, MapPin } from "lucide-react";
+import Header from "../components/Header";
 interface Order {
   id: string;
   items: any[];
@@ -31,7 +33,6 @@ export default function OrdersPage() {
         onValue(ordersRef, (snapshot) => {
           const data = snapshot.val();
           if (data) {
-            // Convert the orders object into an array.
             const loadedOrders = Object.keys(data).map((key) => ({
               id: key,
               ...data[key],
@@ -53,39 +54,39 @@ export default function OrdersPage() {
   }, []);
 
   if (loading) {
-    return <div className="text-center py-10">Loading orders...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center py-10">
+        <p className="text-xl text-gray-600">Loading orders...</p>
+      </div>
+    );
   }
 
   return (
     <main className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow p-4">
-        <h1 className="text-2xl font-bold text-gray-900">My Orders</h1>
-      </header>
-      <div className="max-w-7xl mx-auto p-4">
+    <Header/>
+      <div className="max-w-7xl mx-auto p-6">
         {orders.length === 0 ? (
-          <div className="text-center text-gray-600 py-10">
-            You have no orders yet.
+          <div className="text-center text-gray-600 py-12">
+            <p className="text-xl">You have no orders yet.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {orders.map((order) => (
               <Link
                 key={order.id}
                 href={`/orders/${order.id}`}
-                className="block bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow duration-200"
+                className="block bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow duration-200"
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="text-sm text-gray-500">
-                      Order ID: {order.id}
-                    </p>
-                    <p className="text-lg font-semibold text-gray-800">
+                    <p className="text-sm text-gray-500">Order ID: {order.id}</p>
+                    <p className="text-2xl font-bold text-gray-800 mt-1">
                       ₹{order.total}
                     </p>
                   </div>
                   <div>
                     <span
-                      className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                      className={`px-3 py-1 text-sm font-semibold rounded-full ${
                         order.status === "pending"
                           ? "bg-yellow-200 text-yellow-800"
                           : order.status === "completed"
@@ -97,12 +98,18 @@ export default function OrdersPage() {
                     </span>
                   </div>
                 </div>
-                <div className="mt-2 text-sm text-gray-600">
-                  <p>
-                    Ordered on:{" "}
-                    {new Date(order.purchaseTime).toLocaleDateString()}
-                  </p>
-                  <p>Shipping Address: {order.shippingAddress}</p>
+                <div className="mt-4 space-y-2 text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-gray-500" />
+                    <span>
+                      Ordered on:{" "}
+                      {new Date(order.purchaseTime).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-5 h-5 text-gray-500" />
+                    <span>Shipping Address: {order.shippingAddress}</span>
+                  </div>
                 </div>
               </Link>
             ))}

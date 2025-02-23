@@ -10,8 +10,23 @@ import { Star, ShieldCheck, Heart } from "lucide-react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 
-// Same FavButton logic as in the homepage
-function FavButton({ product }) {
+// Define a Product interface
+interface Product {
+  id: string;
+  productName: string;
+  productPhotoUrls?: string[];
+  productPhotoUrl?: string;
+  originalPrice?: number;
+  discountPrice?: number;
+  // You can add more fields if needed, for example categories, etc.
+  company: {
+    name: string;
+    logo: string;
+  };
+}
+
+// FavButton component with a typed product prop
+function FavButton({ product }: { product: Product }) {
   const [isFav, setIsFav] = useState(false);
 
   useEffect(() => {
@@ -29,14 +44,14 @@ function FavButton({ product }) {
     };
   }, [product.id]);
 
-  const toggleFav = async (e) => {
+  const toggleFav = async (e: React.MouseEvent<HTMLButtonElement>) => {
     // Prevent link navigation
     e.stopPropagation();
     e.preventDefault();
 
     const currentUser = auth.currentUser;
     if (!currentUser) {
-      // Optionally, show login prompt here.
+      // Optionally, show a login prompt here.
       return;
     }
     try {
@@ -76,26 +91,29 @@ function FavButton({ product }) {
 }
 
 export default function ViewAllPage() {
-  const [products, setProducts] = useState([]);
+  // Annotate the state as an array of Product
+  const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
     const companiesRef = ref(database, "companies");
     onValue(companiesRef, (snapshot) => {
       const data = snapshot.val();
-      let loadedProducts = [];
-      for (const companyId in data) {
-        const company = data[companyId];
-        if (company.products) {
-          for (const productId in company.products) {
-            const product = company.products[productId];
-            loadedProducts.push({
-              id: productId,
-              ...product,
-              company: {
-                name: company.companyName,
-                logo: company.companyPhotoUrl,
-              },
-            });
+      let loadedProducts: Product[] = [];
+      if (data) {
+        for (const companyId in data) {
+          const company = data[companyId];
+          if (company.products) {
+            for (const productId in company.products) {
+              const product = company.products[productId];
+              loadedProducts.push({
+                id: productId,
+                ...product,
+                company: {
+                  name: company.companyName,
+                  logo: company.companyPhotoUrl,
+                },
+              });
+            }
           }
         }
       }
@@ -110,7 +128,9 @@ export default function ViewAllPage() {
       <section className="py-6 sm:py-8 lg:py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">All Products</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+              All Products
+            </h2>
             <Link
               href="/"
               className="text-green-600 font-medium hover:text-green-700 flex items-center gap-2 group text-sm sm:text-base"
@@ -131,13 +151,13 @@ export default function ViewAllPage() {
                     src={
                       product.productPhotoUrls
                         ? product.productPhotoUrls[0]
-                        : product.productPhotoUrl
+                        : product.productPhotoUrl || ""
                     }
                     alt={product.productName}
                     fill
                     className="object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                  {product.originalPrice && (
+                  {product.originalPrice && product.discountPrice && (
                     <div className="absolute top-2 left-2 bg-red-500 text-white text-xs sm:text-sm px-2 py-1 rounded-full">
                       {Math.round(
                         ((product.originalPrice - product.discountPrice) /
@@ -147,7 +167,7 @@ export default function ViewAllPage() {
                       % OFF
                     </div>
                   )}
-                  {/* FavButton just like on home page */}
+                  {/* FavButton just like on the homepage */}
                   <FavButton product={product} />
                 </div>
 

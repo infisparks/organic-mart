@@ -10,8 +10,50 @@ import { Star, ShieldCheck, Heart } from "lucide-react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 
-// FavButton logic (same as before)
-function FavButton({ product }) {
+// Define a type for product categories
+interface Category {
+  main: string;
+}
+
+// Define a type for our product
+export interface Product {
+  id: string;
+  productName: string;
+  productPhotoUrls?: string[];
+  productPhotoUrl?: string;
+  originalPrice?: number;
+  discountPrice?: number;
+  categories?: Category[];
+  company: {
+    name: string;
+    logo: string;
+  };
+  // Add any other fields as needed
+}
+
+// Define a type for companies from Firebase
+interface Company {
+  companyName: string;
+  companyPhotoUrl: string;
+  products?: {
+    [key: string]: {
+      productName: string;
+      productPhotoUrls?: string[];
+      productPhotoUrl?: string;
+      originalPrice?: number;
+      discountPrice?: number;
+      categories?: Category[];
+      // Other product properties...
+    };
+  };
+}
+
+// FavButton component props type
+interface FavButtonProps {
+  product: Product;
+}
+
+function FavButton({ product }: FavButtonProps) {
   const [isFav, setIsFav] = useState(false);
 
   useEffect(() => {
@@ -29,7 +71,7 @@ function FavButton({ product }) {
     };
   }, [product.id]);
 
-  const toggleFav = async (e) => {
+  const toggleFav = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     e.preventDefault();
 
@@ -74,7 +116,6 @@ function FavButton({ product }) {
 }
 
 // Mapping for main categories (for the dropdown filter)
-// You can adjust this list as needed.
 const mainCategories = [
   "Organic Groceries & Superfoods",
   "Herbal & Natural Personal Care",
@@ -87,8 +128,9 @@ const mainCategories = [
 ];
 
 export default function SearchPage() {
-  const [products, setProducts] = useState([]);
-  const [filteredProducts, setFilteredProducts] = useState([]);
+  // Annotate state with the proper type
+  const [products, setProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
 
@@ -97,20 +139,22 @@ export default function SearchPage() {
     const companiesRef = ref(database, "companies");
     onValue(companiesRef, (snapshot) => {
       const data = snapshot.val();
-      let loadedProducts = [];
-      for (const companyId in data) {
-        const company = data[companyId];
-        if (company.products) {
-          for (const productId in company.products) {
-            const product = company.products[productId];
-            loadedProducts.push({
-              id: productId,
-              ...product,
-              company: {
-                name: company.companyName,
-                logo: company.companyPhotoUrl,
-              },
-            });
+      let loadedProducts: Product[] = [];
+      if (data) {
+        for (const companyId in data) {
+          const company: Company = data[companyId];
+          if (company.products) {
+            for (const productId in company.products) {
+              const productData = company.products[productId];
+              loadedProducts.push({
+                id: productId,
+                ...productData,
+                company: {
+                  name: company.companyName,
+                  logo: company.companyPhotoUrl,
+                },
+              });
+            }
           }
         }
       }
@@ -190,13 +234,13 @@ export default function SearchPage() {
                       src={
                         product.productPhotoUrls
                           ? product.productPhotoUrls[0]
-                          : product.productPhotoUrl
+                          : product.productPhotoUrl || ""
                       }
                       alt={product.productName}
                       fill
                       className="object-cover transition-transform duration-500 group-hover:scale-105"
                     />
-                    {product.originalPrice && (
+                    {product.originalPrice && product.discountPrice && (
                       <div className="absolute top-2 left-2 bg-red-600 text-white text-xs font-semibold px-2 py-1 rounded">
                         {Math.round(
                           ((product.originalPrice - product.discountPrice) /

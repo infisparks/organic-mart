@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -253,9 +252,9 @@ export default function CategoryPage() {
                   <div className="relative h-64">
                     <Image
                       src={
-                        product.productPhotoUrls
-                          ? product.productPhotoUrls[0]
-                          : product.productPhotoUrl
+                        product.productPhotoUrls?.[0] ??
+                        product.productPhotoUrl ??
+                        "/placeholder.png"
                       }
                       alt={product.productName}
                       fill
