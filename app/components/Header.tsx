@@ -4,16 +4,34 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ShoppingCart, Heart, Search, Leaf, Menu, X } from "lucide-react";
+import {
+  ShoppingCart,
+  Heart,
+  Search,
+  Leaf,
+  Menu,
+  X,
+} from "lucide-react";
 import { auth, database } from "../../lib/firebase";
 import { ref, onValue } from "firebase/database";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [productCount, setProductCount] = useState(0);
   const [favCount, setFavCount] = useState(0);
+  const [user, setUser] = useState<any>(null);
   const router = useRouter();
+
+  // Listen to auth state changes
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+    });
+    return () => {
+      unsubscribeAuth();
+    };
+  }, []);
 
   useEffect(() => {
     let unsubscribeCart: (() => void) | undefined;
@@ -61,6 +79,12 @@ export default function Header() {
     router.push("/search");
   };
 
+  // Logout handler.
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push("/login");
+  };
+
   return (
     <nav className="bg-white border-b sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
@@ -91,9 +115,20 @@ export default function Header() {
           <Link href="/orders" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
             Order
           </Link>
-          <Link href="profile" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
-            Profile
-          </Link>
+          {user ? (
+            <>
+              <Link href="/profile" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
+                Profile
+              </Link>
+              <button onClick={handleLogout} className="text-gray-700 hover:text-green-600 font-medium transition-colors">
+                Logout
+              </button>
+            </>
+          ) : (
+            <Link href="/login" className="text-gray-700 hover:text-green-600 font-medium transition-colors">
+              Login
+            </Link>
+          )}
         </div>
 
         {/* Right Section */}
@@ -112,7 +147,7 @@ export default function Header() {
           <Link href="/search" className="sm:hidden p-2 hover:bg-gray-100 rounded-lg">
             <Search className="w-6 h-6 text-gray-600" />
           </Link>
-          {/* Favorites Icon - wrapped in a Link to /addfav */}
+          {/* Favorites Icon */}
           <Link href="/addfav" className="relative">
             <Heart className="w-6 h-6 text-gray-600 cursor-pointer hover:text-green-600 transition-colors hover:scale-110 transform duration-300" />
             {favCount > 0 && (
@@ -121,6 +156,7 @@ export default function Header() {
               </span>
             )}
           </Link>
+          {/* Shopping Cart Icon */}
           <Link href="/cart" className="relative">
             <ShoppingCart className="w-6 h-6 text-gray-600 cursor-pointer hover:text-green-600 transition-colors hover:scale-110 transform duration-300" />
             {productCount > 0 && (
@@ -152,7 +188,19 @@ export default function Header() {
                 <Link href="/" className="block px-4 py-3 text-gray-700 hover:bg-gray-50">Home</Link>
                 <Link href="/search" className="block px-4 py-3 text-gray-700 hover:bg-gray-50">Shop</Link>
                 <Link href="/orders" className="block px-4 py-3 text-gray-700 hover:bg-gray-50">Order</Link>
-                <Link href="/profile" className="block px-4 py-3 text-gray-700 hover:bg-gray-50">Profile</Link>
+                {user ? (
+                  <>
+                    <Link href="/profile" className="block px-4 py-3 text-gray-700 hover:bg-gray-50">Profile</Link>
+                    <button 
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50"
+                    >
+                      Logout
+                    </button>
+                  </>
+                ) : (
+                  <Link href="/login" className="block px-4 py-3 text-gray-700 hover:bg-gray-50">Login</Link>
+                )}
               </div>
             </div>
           </div>
