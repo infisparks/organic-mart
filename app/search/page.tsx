@@ -229,8 +229,8 @@ export default function SearchPage() {
                   href={`/product/${product.id}`}
                   className="bg-white rounded-lg shadow-lg overflow-hidden group relative transition transform hover:-translate-y-1 hover:shadow-2xl"
                 >
-                  {/* Image Section */}
-                  <div className="relative h-64">
+                  {/* Image Section using 1:1 aspect ratio */}
+                  <div className="relative aspect-square rounded-t-lg overflow-hidden">
                     <Image
                       src={
                         product.productPhotoUrls

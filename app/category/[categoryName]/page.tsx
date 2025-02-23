@@ -6,7 +6,7 @@ import Image from "next/image";
 import { ref, onValue, get, set, remove } from "firebase/database";
 import { database, auth } from "../../../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { Heart } from "lucide-react"; // Import Heart icon
+import { Heart } from "lucide-react";
 import Footer from "@/app/components/Footer";
 import Header from "@/app/components/Header";
 
@@ -142,13 +142,11 @@ function FavButton({ product }: { product: Product }) {
 }
 
 export default function CategoryPage() {
-  // Get the category name from URL parameters and decode it.
   const { categoryName } = useParams() as { categoryName: string };
   const decodedCategoryName = decodeURIComponent(categoryName);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  // State to track a selected sub category (if any)
   const [selectedSub, setSelectedSub] = useState<string>("");
 
   useEffect(() => {
@@ -161,7 +159,6 @@ export default function CategoryPage() {
         if (company.products) {
           for (const productId in company.products) {
             const product = company.products[productId];
-            // Check if product has categories and if any category.main matches the decodedCategoryName
             if (
               product.categories &&
               Array.isArray(product.categories) &&
@@ -184,7 +181,6 @@ export default function CategoryPage() {
     });
   }, [decodedCategoryName]);
 
-  // Filter products by selected sub category (if one is selected)
   const filteredProducts = selectedSub
     ? products.filter((product) =>
         product.categories?.some((cat) => cat.sub === selectedSub)
@@ -199,7 +195,6 @@ export default function CategoryPage() {
     );
   }
 
-  // Get sub categories for this main category
   const subCategories = categoryOptions[decodedCategoryName] || [];
 
   return (
@@ -209,7 +204,6 @@ export default function CategoryPage() {
         <div className="max-w-7xl mx-auto px-4">
           <h1 className="text-3xl font-bold mb-6 text-gray-800">{decodedCategoryName}</h1>
 
-          {/* Render sub category buttons if available */}
           {subCategories.length > 0 && (
             <div className="mb-6 flex flex-wrap gap-2">
               {subCategories.map((subCat) => (
@@ -241,15 +235,16 @@ export default function CategoryPage() {
           {filteredProducts.length === 0 ? (
             <p className="text-gray-600">No products found in this category.</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            // Updated grid: Two cards per row on mobile, two on small screens, three on medium, four on large screens.
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {filteredProducts.map((product) => (
                 <Link
                   key={product.id}
                   href={`/product/${product.id}`}
                   className="bg-white rounded-lg shadow-lg overflow-hidden group relative transition transform hover:-translate-y-1 hover:shadow-2xl"
                 >
-                  {/* Image Section */}
-                  <div className="relative h-64">
+                  {/* Image Section using 1:1 aspect ratio */}
+                  <div className="relative aspect-square rounded-t-lg overflow-hidden">
                     <Image
                       src={
                         product.productPhotoUrls?.[0] ??
@@ -282,7 +277,9 @@ export default function CategoryPage() {
                         height={24}
                         className="rounded-full"
                       />
-                      <span className="text-sm text-gray-600">{product.company.name}</span>
+                      <span className="text-sm text-gray-600">
+                        {product.company.name}
+                      </span>
                     </div>
                     <h3 className="text-lg font-semibold text-gray-800 mb-1 line-clamp-2">
                       {product.productName}
