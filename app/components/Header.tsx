@@ -150,9 +150,9 @@ export default function Header() {
             <div className="py-4">
               <div className="border-t mt-4 pt-4">
                 <Link href="/" className="block px-4 py-3 text-gray-700 hover:bg-gray-50">Home</Link>
-                <Link href="#" className="block px-4 py-3 text-gray-700 hover:bg-gray-50">Shop</Link>
-                <Link href="#" className="block px-4 py-3 text-gray-700 hover:bg-gray-50">About</Link>
-                <Link href="#" className="block px-4 py-3 text-gray-700 hover:bg-gray-50">Contact</Link>
+                <Link href="/search" className="block px-4 py-3 text-gray-700 hover:bg-gray-50">Shop</Link>
+                <Link href="/orders" className="block px-4 py-3 text-gray-700 hover:bg-gray-50">Order</Link>
+                <Link href="/profile" className="block px-4 py-3 text-gray-700 hover:bg-gray-50">Profile</Link>
               </div>
             </div>
           </div>
