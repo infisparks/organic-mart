@@ -221,7 +221,8 @@ export default function SearchPage() {
           {filteredProducts.length === 0 ? (
             <p className="text-center text-gray-600">No products found.</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            // Updated grid: two cards per row on mobile, two on small screens, four on large screens.
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {filteredProducts.map((product) => (
                 <Link
                   key={product.id}
