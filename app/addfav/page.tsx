@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -90,37 +89,40 @@ export default function FavoritesPage() {
         {favorites.length === 0 ? (
           <p className="text-gray-600">You have no favorite products yet.</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          // Grid is updated so that on mobile (default) two cards appear per row.
+          <div className="grid grid-cols-2 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {favorites.map((item) => (
               <div
                 key={item.id}
-                className="bg-white shadow rounded-lg p-4 flex flex-col"
+                className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col transform transition hover:scale-105"
               >
-                <div className="relative h-48 w-full mb-4">
+                {/* Image Container with 1:1 ratio */}
+                <div className="relative w-full aspect-square">
                   <Image
                     src={getThumbnailForProduct(item.productId)}
                     alt={item.productName}
                     fill
-                    className="object-contain object-center rounded"
+                    className="object-cover"
                   />
                 </div>
-                <h2 className="text-lg font-semibold mb-2">
-                  {item.productName}
-                </h2>
-                <p className="text-gray-600 mb-4">₹{item.price}</p>
-                <div className="mt-auto flex justify-between items-center">
-                  <button
-                    onClick={() => handleRemove(item.id)}
-                    className="text-red-500 hover:text-red-600"
-                  >
-                    Remove
-                  </button>
-                  <button
-                    onClick={() => handleBuy(item.productId)}
-                    className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
-                  >
-                    Buy
-                  </button>
+                {/* Product Details */}
+                <div className="p-4 flex flex-col flex-grow">
+                  <h2 className="text-lg font-semibold mb-2">{item.productName}</h2>
+                  <p className="text-gray-600 mb-4">₹{item.price}</p>
+                  <div className="mt-auto flex justify-between items-center">
+                    <button
+                      onClick={() => handleRemove(item.id)}
+                      className="text-red-500 hover:text-red-600 text-sm"
+                    >
+                      Remove
+                    </button>
+                    <button
+                      onClick={() => handleBuy(item.productId)}
+                      className="bg-green-600 text-white text-sm px-3 py-1 rounded hover:bg-green-700"
+                    >
+                      Buy
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

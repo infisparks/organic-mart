@@ -1,6 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
+import { auth, database } from "../../lib/firebase";
+import {
+  onValue,
+  ref as dbRef,
+  update,
+  remove,
+  push,
+} from "firebase/database";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   Leaf,
   Minus,
@@ -11,17 +23,8 @@ import {
   Truck,
   Clock,
 } from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
-import { auth, database } from "../../lib/firebase";
-import {
-  onValue,
-  ref as dbRef,
-  update,
-  remove,
-  push,
-} from "firebase/database";
-import { onAuthStateChanged } from "firebase/auth";
+import Header from "../components/Header";
+import Footer from "../components/Footer";
 
 interface CartItem {
   id: string;
@@ -64,6 +67,7 @@ export default function CartPage() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
+  const router = useRouter();
 
   // Load companies data from Firebase.
   useEffect(() => {
@@ -148,7 +152,6 @@ export default function CartPage() {
         });
         return () => unsubscribeCart();
       } else {
-        console.warn("User not logged in.");
         setCartItems([]);
       }
     });
@@ -209,23 +212,19 @@ export default function CartPage() {
 
   // Function to fetch geolocation and then place the order if successful.
   const handlePlaceOrder = () => {
-    // Check if there are products in the cart.
     if (cartItems.length === 0) {
       alert("Your cart is empty. Please add products to your cart.");
       return;
     }
-    // Check if geolocation is available.
     if (!navigator.geolocation) {
       alert("Geolocation is not supported by your browser.");
       return;
     }
-    // Fetch current location.
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
         setLocation({ latitude, longitude });
         setLoading(true);
-        // Delay to simulate a loading indicator.
         setTimeout(async () => {
           await handleCheckout();
           setLoading(false);
@@ -241,18 +240,7 @@ export default function CartPage() {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2 group">
-              <Leaf className="h-6 w-6 sm:h-8 sm:w-8 text-green-600 group-hover:rotate-12 transition-transform duration-300" />
-              <span className="text-xl sm:text-2xl font-bold text-gray-900">EcoHarvest</span>
-            </Link>
-          </div>
-        </div>
-      </div>
-
+      <Header />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         <div className="flex items-center gap-2 mb-8">
           <Link
@@ -283,12 +271,13 @@ export default function CartPage() {
                   className="bg-white rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow duration-300"
                 >
                   <div className="flex flex-col sm:flex-row gap-6">
-                    <div className="relative w-full sm:w-40 h-40">
+                    {/* Updated Image Container: 1:1 aspect ratio and centered */}
+                    <div className="relative w-full sm:w-40 aspect-square">
                       <Image
                         src={item.image}
                         alt={item.name}
                         fill
-                        className="object-cover rounded-lg"
+                        className="object-contain object-center rounded-lg"
                       />
                     </div>
                     <div className="flex-1 space-y-4">
@@ -383,7 +372,6 @@ export default function CartPage() {
                 </div>
               </div>
 
-              {/* Trigger the new address modal */}
               <button
                 onClick={() => {
                   setShowAddressModal(true);
@@ -460,6 +448,7 @@ export default function CartPage() {
           </div>
         </div>
       )}
+      <Footer />
     </main>
   );
 }
