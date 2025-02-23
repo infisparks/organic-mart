@@ -1,12 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  Heart,
-  ArrowRight,
-  Star,
-  ShieldCheck,
-} from "lucide-react";
+import { Heart, ArrowRight, Star, ShieldCheck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import Footer from "./components/Footer";
@@ -21,6 +16,9 @@ import "slick-carousel/slick/slick-theme.css";
 import { database, auth } from "../lib/firebase";
 import { ref, onValue, get, set, remove } from "firebase/database";
 import { onAuthStateChanged } from "firebase/auth";
+
+// Import AuthPopup for handling unauthenticated favorite actions
+import AuthPopup from "@/app/components/AuthPopup";
 
 // Custom categories for carousel
 const categories = [
@@ -143,9 +141,10 @@ function CategoryCarousel() {
   );
 }
 
-// FavButton component for use in product cards.
+// Updated FavButton component with authentication popup support.
 function FavButton({ product }: { product: any }) {
   const [isFav, setIsFav] = useState(false);
+  const [showAuthPopup, setShowAuthPopup] = useState(false);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
@@ -168,6 +167,8 @@ function FavButton({ product }: { product: any }) {
 
     const currentUser = auth.currentUser;
     if (!currentUser) {
+      // If not logged in, show the AuthPopup.
+      setShowAuthPopup(true);
       return;
     }
     try {
@@ -191,18 +192,24 @@ function FavButton({ product }: { product: any }) {
   };
 
   return (
-    <button
-      onClick={toggleFav}
-      className={`absolute top-2 right-2 p-1.5 sm:p-2 rounded-full shadow-sm transition-colors ${
-        isFav ? "bg-red-500 hover:bg-red-600" : "bg-white/90 hover:bg-white"
-      }`}
-    >
-      <Heart
-        className={`w-3 h-3 sm:w-4 sm:h-4 ${
-          isFav ? "text-white" : "text-gray-600"
+    <>
+      <button
+        onClick={toggleFav}
+        className={`absolute top-2 right-2 p-1.5 sm:p-2 rounded-full shadow-sm transition-colors ${
+          isFav ? "bg-red-500 hover:bg-red-600" : "bg-white/90 hover:bg-white"
         }`}
-      />
-    </button>
+      >
+        <Heart
+          className={`w-3 h-3 sm:w-4 sm:h-4 ${isFav ? "text-white" : "text-gray-600"}`}
+        />
+      </button>
+      {showAuthPopup && (
+        <AuthPopup
+          onClose={() => setShowAuthPopup(false)}
+          onSuccess={() => setShowAuthPopup(false)}
+        />
+      )}
+    </>
   );
 }
 
