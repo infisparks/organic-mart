@@ -13,7 +13,14 @@ import {
 import Image from "next/image";
 import AuthPopup from "../../components/AuthPopup";
 import { auth, database } from "../../../lib/firebase";
-import { get, ref as dbRef, set, remove, push } from "firebase/database";
+import {
+  get,
+  ref as dbRef,
+  set,
+  remove,
+  push,
+  update,
+} from "firebase/database";
 import { onAuthStateChanged } from "firebase/auth";
 
 type ProductDetailsProps = {
@@ -41,9 +48,9 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
   const [isFavorite, setIsFavorite] = useState(false);
   const [inCart, setInCart] = useState(false);
   const [showDirectBuy, setShowDirectBuy] = useState(false);
-  const [buyerName, setBuyerName] = useState("");
-  const [buyerPhone, setBuyerPhone] = useState("");
   const [buyerAddress, setBuyerAddress] = useState("");
+  const [buyerPincode, setBuyerPincode] = useState("");
+  const [buyerPhone, setBuyerPhone] = useState("");
 
   // Use discountPrice if available; otherwise, fallback to originalPrice.
   const displayPrice = product.discountPrice ?? product.originalPrice;
@@ -54,20 +61,38 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
   );
   const images = product.productPhotoUrls ?? [];
 
+  // Prefill shipping details from user profile if available.
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const profileRef = dbRef(database, `user/${user.uid}/profile`);
+        const profileSnap = await get(profileRef);
+        if (profileSnap.exists()) {
+          const profile = profileSnap.val();
+          setBuyerAddress(profile.address || "");
+          setBuyerPincode(profile.pincode || "");
+          setBuyerPhone(profile.phone || "");
+        }
+      }
+    });
+    return () => unsubscribeAuth();
+  }, []);
+
   // Check if product is in cart.
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        const cartRef = dbRef(database, `user/${user.uid}/addtocart/${product.id}`);
+        const cartRef = dbRef(
+          database,
+          `user/${user.uid}/addtocart/${product.id}`
+        );
         const cartSnap = await get(cartRef);
         setInCart(cartSnap.exists());
       } else {
         setInCart(false);
       }
     });
-    return () => {
-      unsubscribeAuth();
-    };
+    return () => unsubscribeAuth();
   }, [product.id]);
 
   // Listen for the favorite status of the current product.
@@ -81,12 +106,10 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
         setIsFavorite(false);
       }
     });
-    return () => {
-      unsubscribeAuth();
-    };
+    return () => unsubscribeAuth();
   }, [product.id]);
 
-  // Toggle favorite status using the product id as key.
+  // Toggle favorite status.
   const toggleFavorite = async () => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
@@ -94,7 +117,10 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
       return;
     }
     try {
-      const favRef = dbRef(database, `user/${currentUser.uid}/addfav/${product.id}`);
+      const favRef = dbRef(
+        database,
+        `user/${currentUser.uid}/addfav/${product.id}`
+      );
       const favSnap = await get(favRef);
       if (favSnap.exists()) {
         await remove(favRef);
@@ -127,7 +153,10 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
       return;
     }
     try {
-      const cartItemRef = dbRef(database, `user/${currentUser.uid}/addtocart/${product.id}`);
+      const cartItemRef = dbRef(
+        database,
+        `user/${currentUser.uid}/addtocart/${product.id}`
+      );
       const cartItemSnap = await get(cartItemRef);
       if (cartItemSnap.exists()) {
         alert("This product is already in your cart!");
@@ -155,7 +184,10 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
       return;
     }
     try {
-      const cartItemRef = dbRef(database, `user/${currentUser.uid}/addtocart/${product.id}`);
+      const cartItemRef = dbRef(
+        database,
+        `user/${currentUser.uid}/addtocart/${product.id}`
+      );
       await remove(cartItemRef);
       setInCart(false);
     } catch (error) {
@@ -173,8 +205,26 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
     setShowDirectBuy(true);
   };
 
-  // Submit direct buy order with nested structure:
-  // Data is added under aadd/item/0/add
+  // Helper to fetch current geolocation.
+  const getCurrentLocation = (): Promise<{ lat: number; lng: number }> => {
+    return new Promise((resolve, reject) => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            });
+          },
+          (error) => reject(error)
+        );
+      } else {
+        reject(new Error("Geolocation is not supported by this browser."));
+      }
+    });
+  };
+
+  // Submit direct buy order.
   const handleDirectBuySubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const currentUser = auth.currentUser;
@@ -182,38 +232,53 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
       setShowAuthPopup(true);
       return;
     }
-    if (!buyerName || !buyerPhone || !buyerAddress) {
-      alert("Please fill in all fields");
+    if (!buyerAddress || !buyerPincode || !buyerPhone) {
+      alert("Please fill in your shipping address, pincode, and phone number");
       return;
     }
     try {
+      // Auto fetch current location.
+      const location = await getCurrentLocation();
+      // Create order.
       const orderRef = dbRef(database, `user/${currentUser.uid}/order`);
       const newOrderRef = push(orderRef);
       await set(newOrderRef, {
-       
-          item: {
-            0: {
-              
-                productId: product.id,
-                productName: product.productName,
-                quantity: quantity,
-                price: displayPrice,
-                buyerName,
-                buyerPhone,
-                buyerAddress,
-              },
-              purchaseTime: Date.now(),
-              status : "pending",
-              total : displayPrice
-            },
-          
-        
+        items: [
+          {
+            description: "",
+            id: product.id,
+            image: product.productPhotoUrls?.[0] || "",
+            name: product.productName,
+            originalPrice: product.originalPrice,
+            price: displayPrice,
+            productId: product.id,
+            quantity: quantity,
+          },
+        ],
+        purchaseTime: Date.now(),
+        shipping: 99, // Adjust shipping cost if needed.
+        shippingAddress: buyerAddress,
+        pincode: buyerPincode,
+        phone: buyerPhone,
+        status: "pending",
+        subtotal: displayPrice * quantity,
+        total: displayPrice * quantity + 99,
+        location: location,
+      });
+      // Update user profile with shipping details and location.
+      const profileRef = dbRef(database, `user/${currentUser.uid}/profile`);
+      await update(profileRef, {
+        address: buyerAddress,
+        pincode: buyerPincode,
+        phone: buyerPhone,
+        lat: location.lat,
+        lng: location.lng,
       });
       alert("Order placed successfully!");
       setShowDirectBuy(false);
-      setBuyerName("");
-      setBuyerPhone("");
       setBuyerAddress("");
+      setBuyerPincode("");
+      setBuyerPhone("");
     } catch (error) {
       console.error("Error placing order:", error);
       alert("Could not place order.");
@@ -432,12 +497,23 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
             <form onSubmit={handleDirectBuySubmit}>
               <div className="mb-3">
                 <label className="block text-sm font-medium text-gray-700">
-                  Name
+                  Address
+                </label>
+                <textarea
+                  value={buyerAddress}
+                  onChange={(e) => setBuyerAddress(e.target.value)}
+                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                  required
+                />
+              </div>
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700">
+                  Pincode
                 </label>
                 <input
                   type="text"
-                  value={buyerName}
-                  onChange={(e) => setBuyerName(e.target.value)}
+                  value={buyerPincode}
+                  onChange={(e) => setBuyerPincode(e.target.value)}
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
                   required
                 />
@@ -450,17 +526,6 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
                   type="tel"
                   value={buyerPhone}
                   onChange={(e) => setBuyerPhone(e.target.value)}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                  required
-                />
-              </div>
-              <div className="mb-3">
-                <label className="block text-sm font-medium text-gray-700">
-                  Address
-                </label>
-                <textarea
-                  value={buyerAddress}
-                  onChange={(e) => setBuyerAddress(e.target.value)}
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
                   required
                 />

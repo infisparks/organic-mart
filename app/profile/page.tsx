@@ -10,17 +10,18 @@ import { ref, onValue, update } from "firebase/database";
 import { auth, database } from "../../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
-// Define a type for the profile object.
+// Updated Profile type to include pincode.
 interface Profile {
   name?: string;
   phone?: string;
   address?: string;
+  pincode?: string;
   lat?: number;
   lng?: number;
   photo?: string;
 }
 
-// Define the props for the EditProfileModal component.
+// Updated props for EditProfileModal to include pincode.
 interface EditProfileModalProps {
   profile: Profile;
   onClose: () => void;
@@ -28,16 +29,17 @@ interface EditProfileModalProps {
     name: string;
     phone: string;
     address: string;
+    pincode: string;
     lat: number;
     lng: number;
   }) => void;
 }
 
-// A simple modal component for editing profile details.
 function EditProfileModal({ profile, onClose, onSave }: EditProfileModalProps) {
   const [name, setName] = useState(profile?.name || "");
   const [phone, setPhone] = useState(profile?.phone || "");
   const [address, setAddress] = useState(profile?.address || "");
+  const [pincode, setPincode] = useState(profile?.pincode || "");
   const [lat, setLat] = useState(profile?.lat || 0);
   const [lng, setLng] = useState(profile?.lng || 0);
   const [updatingLocation, setUpdatingLocation] = useState(false);
@@ -71,7 +73,7 @@ function EditProfileModal({ profile, onClose, onSave }: EditProfileModalProps) {
   };
 
   const handleSave = () => {
-    onSave({ name, phone, address, lat, lng });
+    onSave({ name, phone, address, pincode, lat, lng });
   };
 
   return (
@@ -102,6 +104,15 @@ function EditProfileModal({ profile, onClose, onSave }: EditProfileModalProps) {
             className="mt-1 block w-full rounded border-gray-300 p-2"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
+          />
+        </label>
+        <label className="block mb-2">
+          <span className="text-gray-700">Pincode</span>
+          <input
+            type="text"
+            className="mt-1 block w-full rounded border-gray-300 p-2"
+            value={pincode}
+            onChange={(e) => setPincode(e.target.value)}
           />
         </label>
         <div className="flex items-center justify-between mt-4">
@@ -137,7 +148,6 @@ export default function ProfilePage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const router = useRouter();
 
-  // Fetch user profile and related stats.
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -171,8 +181,16 @@ export default function ProfilePage() {
           }
         });
 
-        // For demonstration, assume orderCount is the same as cartCount.
-        setOrderCount(cartCount);
+        // Fetch orders count.
+        const orderRef = ref(database, `user/${user.uid}/order`);
+        onValue(orderRef, (snapshot) => {
+          if (snapshot.exists()) {
+            const data = snapshot.val();
+            setOrderCount(Object.keys(data).length);
+          } else {
+            setOrderCount(0);
+          }
+        });
       } else {
         router.push("/login");
       }
@@ -180,12 +198,13 @@ export default function ProfilePage() {
     return () => {
       unsubscribeAuth();
     };
-  }, [cartCount, router]);
+  }, [router]);
 
   const handleSaveProfile = async (newProfile: {
     name: string;
     phone: string;
     address: string;
+    pincode: string;
     lat: number;
     lng: number;
   }) => {
@@ -208,7 +227,7 @@ export default function ProfilePage() {
               {profile?.photo ? (
                 <Image
                   src={profile.photo}
-                  alt={profile.name ?? "User Photo"}
+                  alt={profile.name || "User Photo"}
                   width={80}
                   height={80}
                   className="rounded-full object-cover"
@@ -222,8 +241,15 @@ export default function ProfilePage() {
                 <h1 className="text-3xl font-bold text-gray-900">
                   {profile?.name || "Your Name"}
                 </h1>
-                <p className="text-gray-600">{profile?.address || "Your Address"}</p>
-                <p className="text-gray-600">{profile?.phone || "Your Phone"}</p>
+                <p className="text-gray-600">
+                  {profile?.address || "Your Address"}
+                </p>
+                <p className="text-gray-600">
+                  {profile?.pincode || "Your Pincode"}
+                </p>
+                <p className="text-gray-600">
+                  {profile?.phone || "Your Phone"}
+                </p>
               </div>
             </div>
             <button
@@ -235,18 +261,24 @@ export default function ProfilePage() {
           </div>
 
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div className="bg-gray-50 p-4 rounded-lg text-center">
-              <p className="text-2xl font-bold text-gray-900">{cartCount}</p>
-              <p className="text-gray-600">Items in Cart</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg text-center">
-              <p className="text-2xl font-bold text-gray-900">{favCount}</p>
-              <p className="text-gray-600">Favorites</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg text-center">
-              <p className="text-2xl font-bold text-gray-900">{orderCount}</p>
-              <p className="text-gray-600">Total Orders</p>
-            </div>
+            <Link href="/cart">
+              <div className="bg-gray-50 p-4 rounded-lg text-center cursor-pointer">
+                <p className="text-2xl font-bold text-gray-900">{cartCount}</p>
+                <p className="text-gray-600">Items in Cart</p>
+              </div>
+            </Link>
+            <Link href="/addfav">
+              <div className="bg-gray-50 p-4 rounded-lg text-center cursor-pointer">
+                <p className="text-2xl font-bold text-gray-900">{favCount}</p>
+                <p className="text-gray-600">Favorites</p>
+              </div>
+            </Link>
+            <Link href="/orders">
+              <div className="bg-gray-50 p-4 rounded-lg text-center cursor-pointer">
+                <p className="text-2xl font-bold text-gray-900">{orderCount}</p>
+                <p className="text-gray-600">Total Orders</p>
+              </div>
+            </Link>
           </div>
 
           <div className="mt-8">

@@ -6,7 +6,7 @@ export default function Footer() {
     <footer className="bg-white border-t">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Newsletter Section */}
-        <div className="py-12 sm:py-16">
+        {/* <div className="py-12 sm:py-16">
           <div className="text-center max-w-2xl mx-auto">
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Join Our Newsletter</h2>
             <p className="text-gray-600 mb-6">Stay updated with our latest organic products and exclusive offers.</p>
@@ -21,7 +21,7 @@ export default function Footer() {
               </button>
             </form>
           </div>
-        </div>
+        </div> */}
 
         <hr className="border-gray-100" />
 
