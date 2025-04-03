@@ -112,7 +112,7 @@ export default function RegistrationForm() {
       };
 
       // Save the registration data in the Realtime Database
-      const regRef = dbRef(database, 'registrations/' + uid);
+      const regRef = dbRef(database, 'companies/' + uid);
       await set(regRef, registrationData);
 
       // Registration successful - redirect to the dashboard or a success page
