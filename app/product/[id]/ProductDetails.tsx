@@ -9,6 +9,7 @@ import {
   Truck,
   Clock,
   Star,
+  MessageSquare,
 } from "lucide-react";
 import Image from "next/image";
 import AuthPopup from "../../components/AuthPopup";
@@ -20,6 +21,7 @@ import {
   remove,
   push,
   update,
+  onValue,
 } from "firebase/database";
 import { onAuthStateChanged } from "firebase/auth";
 
@@ -52,16 +54,25 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
   const [buyerPincode, setBuyerPincode] = useState("");
   const [buyerPhone, setBuyerPhone] = useState("");
 
-  // Use discountPrice if available; otherwise, fallback to originalPrice.
+  // Review-related state.
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewText, setReviewText] = useState("");
+  const [hasReviewed, setHasReviewed] = useState(false);
+  const [reviews, setReviews] = useState<
+    { uid: string; rating: number; reviewText: string; createdAt: number }[]
+  >([]);
+
+  // Use discountPrice if available; otherwise fallback to originalPrice.
   const displayPrice = product.discountPrice ?? product.originalPrice;
 
-  // For the "selected image", choose the first image if available.
+  // For the "selected image", choose the first if available.
   const [selectedImage, setSelectedImage] = useState(
     product.productPhotoUrls?.[0] ?? ""
   );
   const images = product.productPhotoUrls ?? [];
 
-  // Prefill shipping details from user profile if available.
+  // Prefill shipping details from user profile.
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -95,7 +106,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
     return () => unsubscribeAuth();
   }, [product.id]);
 
-  // Listen for the favorite status of the current product.
+  // Listen for favorite status.
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -108,6 +119,50 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
     });
     return () => unsubscribeAuth();
   }, [product.id]);
+
+  // Check if the user already reviewed this product.
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const reviewRef = dbRef(
+          database,
+          `products/${product.id}/reviews/${user.uid}`
+        );
+        const reviewSnap = await get(reviewRef);
+        setHasReviewed(reviewSnap.exists());
+      } else {
+        setHasReviewed(false);
+      }
+    });
+    return () => unsubscribe();
+  }, [product.id]);
+
+  // Subscribe to all reviews for this product.
+  useEffect(() => {
+    const reviewsRef = dbRef(database, `products/${product.id}/reviews`);
+    const unsubscribeReviews = onValue(reviewsRef, (snapshot) => {
+      const reviewsData = snapshot.val();
+      if (reviewsData) {
+        const reviewsArray = Object.keys(reviewsData).map((key) => ({
+          uid: key,
+          ...reviewsData[key],
+        }));
+        setReviews(reviewsArray);
+      } else {
+        setReviews([]);
+      }
+    });
+    return () => unsubscribeReviews();
+  }, [product.id]);
+
+  // Calculate aggregated rating.
+  const reviewCount = reviews.length;
+  const averageRating =
+    reviewCount > 0
+      ? (
+          reviews.reduce((sum, review) => sum + review.rating, 0) / reviewCount
+        ).toFixed(1)
+      : null;
 
   // Toggle favorite status.
   const toggleFavorite = async () => {
@@ -195,7 +250,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
     }
   };
 
-  // Handle direct buy button click.
+  // Direct buy functionality.
   const handleDirectBuy = () => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
@@ -205,7 +260,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
     setShowDirectBuy(true);
   };
 
-  // Helper to fetch current geolocation.
+  // Helper: fetch current geolocation.
   const getCurrentLocation = (): Promise<{ lat: number; lng: number }> => {
     return new Promise((resolve, reject) => {
       if (navigator.geolocation) {
@@ -225,7 +280,9 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
   };
 
   // Submit direct buy order.
-  const handleDirectBuySubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleDirectBuySubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
     e.preventDefault();
     const currentUser = auth.currentUser;
     if (!currentUser) {
@@ -233,7 +290,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
       return;
     }
     if (!buyerAddress || !buyerPincode || !buyerPhone) {
-      alert("Please fill in your shipping address, pincode, and phone number");
+      alert("Please fill in your shipping details.");
       return;
     }
     try {
@@ -256,7 +313,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
           },
         ],
         purchaseTime: Date.now(),
-        shipping: 99, // Adjust shipping cost if needed.
+        shipping: 99,
         shippingAddress: buyerAddress,
         pincode: buyerPincode,
         phone: buyerPhone,
@@ -265,7 +322,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
         total: displayPrice * quantity + 99,
         location: location,
       });
-      // Update user profile with shipping details and location.
+      // Update user profile with shipping details.
       const profileRef = dbRef(database, `user/${currentUser.uid}/profile`);
       await update(profileRef, {
         address: buyerAddress,
@@ -294,6 +351,42 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
   const updateQuantity = (newQuantity: number) => {
     if (newQuantity < 1) return;
     setQuantity(newQuantity);
+  };
+
+  // Handle review submission.
+  const handleReviewSubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
+    e.preventDefault();
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      setShowAuthPopup(true);
+      return;
+    }
+    try {
+      const reviewRef = dbRef(
+        database,
+        `products/${product.id}/reviews/${currentUser.uid}`
+      );
+      const reviewSnap = await get(reviewRef);
+      if (reviewSnap.exists()) {
+        alert("You have already reviewed this product!");
+        return;
+      }
+      await set(reviewRef, {
+        rating: reviewRating,
+        reviewText: reviewText,
+        createdAt: Date.now(),
+      });
+      setHasReviewed(true);
+      alert("Review submitted successfully!");
+      setShowReviewModal(false);
+      setReviewRating(5);
+      setReviewText("");
+    } catch (error) {
+      console.error("Error submitting review:", error);
+      alert("Could not submit review.");
+    }
   };
 
   return (
@@ -344,13 +437,31 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
             <h3 className="font-medium text-gray-900 text-base sm:text-lg">
               {product.company.name}
             </h3>
-            <div className="flex items-center gap-1 text-yellow-400">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className="w-4 h-4 fill-current" />
-              ))}
-              <span className="text-xs sm:text-sm text-gray-600 ml-1">
-                4.8 (120 reviews)
-              </span>
+            {/* Display aggregated review if available */}
+            <div className="flex items-center gap-1">
+              {averageRating ? (
+                <>
+                  <div className="flex items-center gap-1">
+                    {[...Array(5)].map((_, i) => (
+                      <Star
+                        key={i}
+                        className={`w-4 h-4 ${
+                          i < Math.round(Number(averageRating))
+                            ? "text-yellow-400"
+                            : "text-gray-300"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-xs sm:text-sm text-gray-600 ml-1">
+                    {averageRating} ({reviewCount} reviews)
+                  </span>
+                </>
+              ) : (
+                <span className="text-xs sm:text-sm text-gray-600">
+                  No reviews yet
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -466,6 +577,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
           </button>
         </div>
 
+        {/* Shipping Details */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 pt-4 sm:pt-6 border-t">
           <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
             <ShieldCheck className="w-5 h-5 text-green-600 flex-shrink-0" />
@@ -479,6 +591,58 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
             <Clock className="w-5 h-5 text-green-600 flex-shrink-0" />
             <span>24-48 hour delivery</span>
           </div>
+        </div>
+
+        {/* Reviews Section */}
+        <div className="mt-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+            <MessageSquare className="w-5 h-5" /> Reviews
+          </h2>
+          {hasReviewed ? (
+            <p className="text-gray-600">You have already reviewed this product.</p>
+          ) : (
+            <button
+              onClick={() => setShowReviewModal(true)}
+              className="bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700 transition-colors flex items-center gap-2"
+            >
+              <MessageSquare className="w-5 h-5" /> Write a Review
+            </button>
+          )}
+        </div>
+
+        {/* List of All Reviews */}
+        <div className="mt-6">
+          {reviews.length > 0 ? (
+            <div className="space-y-4">
+              {reviews.map((review) => (
+                <div
+                  key={review.uid}
+                  className="p-4 border rounded-lg bg-gray-50"
+                >
+                  <div className="flex items-center mb-2">
+                    {[...Array(5)].map((_, i) => (
+                      <Star
+                        key={i}
+                        className={`w-4 h-4 ${
+                          i < review.rating
+                            ? "text-yellow-400"
+                            : "text-gray-300"
+                        }`}
+                      />
+                    ))}
+                    <span className="ml-2 text-xs text-gray-600">
+                      {new Date(review.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="text-gray-800">{review.reviewText}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-600 mt-4">
+              No reviews yet. Be the first to review this product.
+            </p>
+          )}
         </div>
       </div>
 
@@ -543,6 +707,78 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
                   className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
                   Confirm
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Professional Review Modal */}
+      {showReviewModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white p-6 rounded-lg w-11/12 max-w-lg shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <MessageSquare className="w-6 h-6" /> Write a Review
+              </h2>
+              <button
+                onClick={() => setShowReviewModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleReviewSubmit}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Your Rating
+                </label>
+                <div className="flex space-x-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewRating(star)}
+                      className="focus:outline-none"
+                    >
+                      <Star
+                        className={`w-8 h-8 ${
+                          star <= reviewRating
+                            ? "text-yellow-400"
+                            : "text-gray-300"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Your Review
+                </label>
+                <textarea
+                  value={reviewText}
+                  onChange={(e) => setReviewText(e.target.value)}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  rows={4}
+                  placeholder="Share your experience..."
+                  required
+                ></textarea>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setShowReviewModal(false)}
+                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  Submit Review
                 </button>
               </div>
             </form>

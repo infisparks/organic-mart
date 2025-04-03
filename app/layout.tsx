@@ -5,7 +5,7 @@ import { Inter } from 'next/font/google';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'EcoHarvest - Organic Products',
+  title: 'Organixa - Organic Products',
   description: 'Fresh organic products delivered to your doorstep',
 };
 

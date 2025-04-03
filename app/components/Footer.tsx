@@ -31,7 +31,7 @@ export default function Footer() {
           <div className="space-y-6">
             <Link href="/" className="flex items-center gap-2 group">
               <Leaf className="h-6 w-6 text-green-600 group-hover:rotate-12 transition-transform duration-300" />
-              <span className="text-xl font-bold text-gray-900">EcoHarvest</span>
+              <span className="text-xl font-bold text-gray-900">Organixa</span>
             </Link>
             <p className="text-gray-600">Your trusted source for premium organic products, delivered fresh to your doorstep.</p>
             <div className="flex items-center gap-4">
@@ -98,9 +98,9 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a href="mailto:info@ecoharvest.com" className="flex items-center gap-3 text-gray-600 hover:text-green-600 transition-colors">
+                <a href="mailto:info@Organixa.com" className="flex items-center gap-3 text-gray-600 hover:text-green-600 transition-colors">
                   <Mail className="w-5 h-5" />
-                  <span>info@ecoharvest.com</span>
+                  <span>info@Organixa.com</span>
                 </a>
               </li>
             </ul>
@@ -112,7 +112,7 @@ export default function Footer() {
         {/* Bottom Bar */}
         <div className="py-6 flex flex-col sm:flex-row justify-between items-center gap-4">
           <p className="text-gray-600 text-sm text-center sm:text-left">
-            © {new Date().getFullYear()} EcoHarvest. All rights reserved.
+            © {new Date().getFullYear()} Organixa. All rights reserved.
           </p>
           <div className="flex items-center gap-6">
             <Link href="#" className="text-sm text-gray-600 hover:text-green-600 transition-colors">

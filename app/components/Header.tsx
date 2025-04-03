@@ -100,7 +100,7 @@ export default function Header() {
         <Link href="/" className="flex items-center gap-2 group">
           <Leaf className="h-6 w-6 sm:h-8 sm:w-8 text-green-600 group-hover:rotate-12 transition-transform duration-300" />
           <span className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
-            EcoHarvest
+            Organixa
           </span>
         </Link>
 
@@ -174,7 +174,7 @@ export default function Header() {
             <div className="p-4 border-b flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <Leaf className="h-6 w-6 text-green-600" />
-                <span className="text-xl font-bold text-gray-900">EcoHarvest</span>
+                <span className="text-xl font-bold text-gray-900">Organixa</span>
               </div>
               <button 
                 onClick={() => setIsMobileMenuOpen(false)}
