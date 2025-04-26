@@ -1,59 +1,109 @@
-'use client';
+"use client"
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ref as dbRef, set } from 'firebase/database';
-import { storage, database, auth } from '../../lib/firebase';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { v4 as uuidv4 } from 'uuid';
+import type React from "react"
+
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { ref as dbRef, set } from "firebase/database"
+import { storage, database, auth } from "../../lib/firebase"
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage"
+import { createUserWithEmailAndPassword } from "firebase/auth"
+import { v4 as uuidv4 } from "uuid"
 
 export default function RegistrationForm() {
-  const router = useRouter();
-  const [registrationType, setRegistrationType] = useState<'vendor' | 'manufacture'>('vendor');
-  const [companyName, setCompanyName] = useState('');
-  const [registerNo, setRegisterNo] = useState('');
-  const [companyType, setCompanyType] = useState('LLP'); // or 'Pvt'
-  const [certificateFile, setCertificateFile] = useState<File | null>(null);
-  const [isoFile, setIsoFile] = useState<File | null>(null);
-  const [gstNo, setGstNo] = useState('');
-  const [companyPersonName, setCompanyPersonName] = useState('');
-  const [mobileNumber, setMobileNumber] = useState('');
-  const [alternateNumber, setAlternateNumber] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [companyWebsite, setCompanyWebsite] = useState('');
-  const [companyAddress, setCompanyAddress] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [certificatePreviewUrl, setCertificatePreviewUrl] = useState('');
+  const router = useRouter()
+  const [registrationType, setRegistrationType] = useState<"vendor" | "manufacture">("vendor")
+  const [companyName, setCompanyName] = useState("")
+  const [registerNo, setRegisterNo] = useState("")
+  const [companyType, setCompanyType] = useState("LLP") // or 'Pvt'
+  const [certificateFile, setCertificateFile] = useState<File | null>(null)
+  const [isoFile, setIsoFile] = useState<File | null>(null)
+  const [gstNo, setGstNo] = useState("")
+  const [companyPersonName, setCompanyPersonName] = useState("")
+  const [mobileNumber, setMobileNumber] = useState("")
+  const [alternateNumber, setAlternateNumber] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [companyWebsite, setCompanyWebsite] = useState("")
+  const [companyAddress, setCompanyAddress] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState("")
+  const [certificatePreviewUrl, setCertificatePreviewUrl] = useState("")
+
+  // New state for logo upload and preview
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState("")
+
+  // New state for account details
+  const [accountNumber, setAccountNumber] = useState("")
+  const [bankName, setBankName] = useState("")
+  const [ifscCode, setIfscCode] = useState("")
+
+  // New state for delivery details
+  const [deliveryType, setDeliveryType] = useState<"self" | "organiza">("self")
+  const [estimatedDeliveryTime, setEstimatedDeliveryTime] = useState("")
 
   // General file upload function
   const uploadFile = async (file: File, folder: string) => {
-    const uniqueFileName = uuidv4();
-    const fileRef = storageRef(storage, `${folder}/${uniqueFileName}`);
-    const uploadResult = await uploadBytes(fileRef, file);
-    const downloadUrl = await getDownloadURL(uploadResult.ref);
-    return downloadUrl;
-  };
+    const uniqueFileName = uuidv4()
+    const fileRef = storageRef(storage, `${folder}/${uniqueFileName}`)
+    const uploadResult = await uploadBytes(fileRef, file)
+    const downloadUrl = await getDownloadURL(uploadResult.ref)
+    return downloadUrl
+  }
 
-  // Handle certificate file change and set a preview if it is an image
+  // Handle certificate file change and preview if image
   const handleCertificateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    setCertificateFile(file);
-    if (file && file.type.startsWith('image/')) {
-      const previewUrl = URL.createObjectURL(file);
-      setCertificatePreviewUrl(previewUrl);
+    const file = e.target.files?.[0] || null
+    setCertificateFile(file)
+    if (file && file.type.startsWith("image/")) {
+      const previewUrl = URL.createObjectURL(file)
+      setCertificatePreviewUrl(previewUrl)
     } else {
-      setCertificatePreviewUrl('');
+      setCertificatePreviewUrl("")
     }
-  };
+  }
+
+  // Handle logo file change with validations: 300x300, under 500KB, and preview display
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null
+    if (file) {
+      if (file.size > 500 * 1024) {
+        setMessage("Logo must be under 500KB.")
+        setLogoFile(null)
+        setLogoPreviewUrl("")
+        return
+      }
+      const img = new Image()
+      const previewUrl = URL.createObjectURL(file)
+      img.onload = () => {
+        if (img.width !== 300 || img.height !== 300) {
+          setMessage("Logo must be exactly 300px by 300px.")
+          setLogoFile(null)
+          setLogoPreviewUrl("")
+        } else {
+          setLogoFile(file)
+          setLogoPreviewUrl(previewUrl)
+          setMessage("")
+        }
+      }
+      img.onerror = () => {
+        setMessage("Invalid image file for logo.")
+        setLogoFile(null)
+        setLogoPreviewUrl("")
+      }
+      img.src = previewUrl
+    } else {
+      setLogoFile(null)
+      setLogoPreviewUrl("")
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setMessage('');
+    e.preventDefault()
+    setMessage("")
 
-    // Validate required fields (note: companyWebsite is optional)
+    // Validate required fields
     if (
       !companyName ||
       !registerNo ||
@@ -65,32 +115,44 @@ export default function RegistrationForm() {
       !alternateNumber ||
       !email ||
       !password ||
-      !companyAddress
+      !companyAddress ||
+      !logoFile ||
+      !accountNumber ||
+      !bankName ||
+      !ifscCode
     ) {
-      setMessage('Please fill in all required fields.');
-      return;
+      setMessage("Please fill in all required fields.")
+      return
     }
     // For manufacture registration the ISO file is required.
-    if (registrationType === 'manufacture' && !isoFile) {
-      setMessage('Please upload the ISO certificate.');
-      return;
+    if (registrationType === "manufacture" && !isoFile) {
+      setMessage("Please upload the ISO certificate.")
+      return
+    }
+    // If delivery type is 'self', estimated delivery time is required.
+    if (deliveryType === "self" && !estimatedDeliveryTime) {
+      setMessage("Please enter the estimated delivery time for self delivery.")
+      return
     }
 
-    setLoading(true);
+    setLoading(true)
 
     try {
       // Create the user with Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const uid = userCredential.user.uid;
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      const uid = userCredential.user.uid
 
       // Upload the certificate file and get its URL
-      const certificateUrl = await uploadFile(certificateFile, 'company-certificates');
+      const certificateUrl = await uploadFile(certificateFile, "company-certificates")
 
       // Upload the ISO file if provided (for manufacture it’s required; vendor it’s optional)
-      let isoUrl = '';
+      let isoUrl = ""
       if (isoFile) {
-        isoUrl = await uploadFile(isoFile, 'iso-certificates');
+        isoUrl = await uploadFile(isoFile, "iso-certificates")
       }
+
+      // Upload the logo file and get its URL
+      const logoUrl = await uploadFile(logoFile, "company-logos")
 
       // Prepare the registration data to be saved
       const registrationData = {
@@ -100,30 +162,36 @@ export default function RegistrationForm() {
         registerNo,
         companyType,
         certificateUrl,
-        isoUrl, // will be empty string if not provided
+        isoUrl,
         gstNo,
         companyPersonName,
         mobileNumber,
         alternateNumber,
         email,
-        companyWebsite: companyWebsite || '',
+        companyWebsite: companyWebsite || "",
         companyAddress,
-        status: 'pending',
-      };
+        companyPhotoUrl: logoUrl,
+        accountNumber,
+        bankName,
+        ifscCode,
+        deliveryType,
+        estimatedDeliveryTime: deliveryType === "self" ? estimatedDeliveryTime : "",
+        status: "pending",
+      }
 
       // Save the registration data in the Realtime Database
-      const regRef = dbRef(database, 'companies/' + uid);
-      await set(regRef, registrationData);
+      const regRef = dbRef(database, "companies/" + uid)
+      await set(regRef, registrationData)
 
       // Registration successful - redirect to the dashboard or a success page
-      router.push('/dashboard');
+      router.push("/dashboard")
     } catch (error: any) {
-      console.error('Registration error:', error);
-      setMessage(error.message || 'Error during registration. Please try again later.');
+      console.error("Registration error:", error)
+      setMessage(error.message || "Error during registration. Please try again later.")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -131,17 +199,15 @@ export default function RegistrationForm() {
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
           {/* Header Section */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-8">
-            <h1 className="text-4xl font-bold text-white text-center">
-              Industrial Partner Registration
-            </h1>
+            <h1 className="text-4xl font-bold text-white text-center">Industrial Partner Registration</h1>
             <div className="flex justify-center mt-6 space-x-4">
               <button
                 type="button"
-                onClick={() => setRegistrationType('vendor')}
+                onClick={() => setRegistrationType("vendor")}
                 className={`px-6 py-2 rounded-full flex items-center transition-all ${
-                  registrationType === 'vendor'
-                    ? 'bg-white text-blue-600 shadow-lg'
-                    : 'bg-blue-500/20 text-white hover:bg-blue-500/30'
+                  registrationType === "vendor"
+                    ? "bg-white text-blue-600 shadow-lg"
+                    : "bg-blue-500/20 text-white hover:bg-blue-500/30"
                 }`}
               >
                 <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -151,11 +217,11 @@ export default function RegistrationForm() {
               </button>
               <button
                 type="button"
-                onClick={() => setRegistrationType('manufacture')}
+                onClick={() => setRegistrationType("manufacture")}
                 className={`px-6 py-2 rounded-full flex items-center transition-all ${
-                  registrationType === 'manufacture'
-                    ? 'bg-white text-blue-600 shadow-lg'
-                    : 'bg-blue-500/20 text-white hover:bg-blue-500/30'
+                  registrationType === "manufacture"
+                    ? "bg-white text-blue-600 shadow-lg"
+                    : "bg-blue-500/20 text-white hover:bg-blue-500/30"
                 }`}
               >
                 <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -171,7 +237,11 @@ export default function RegistrationForm() {
             {message && (
               <div className="mb-6 p-4 rounded-lg bg-red-100 border border-red-200 flex items-center">
                 <svg className="w-5 h-5 text-red-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clipRule="evenodd"
+                  />
                 </svg>
                 <span className="text-red-600">{message}</span>
               </div>
@@ -182,9 +252,7 @@ export default function RegistrationForm() {
               <div className="space-y-5">
                 {/* Company Name */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Company Name *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Company Name *</label>
                   <input
                     type="text"
                     value={companyName}
@@ -196,9 +264,7 @@ export default function RegistrationForm() {
                 </div>
                 {/* Registration Number */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Registration Number *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Registration Number *</label>
                   <input
                     type="text"
                     value={registerNo}
@@ -210,9 +276,7 @@ export default function RegistrationForm() {
                 </div>
                 {/* Company Type */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Company Type *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Company Type *</label>
                   <select
                     value={companyType}
                     onChange={(e) => setCompanyType(e.target.value)}
@@ -225,17 +289,20 @@ export default function RegistrationForm() {
                 </div>
                 {/* Company Certificate Upload */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Registered Company Certificate *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Registered Company Certificate *</label>
                   <div className="mt-1 flex justify-center items-center w-full">
                     <label className="flex flex-col w-full h-32 border-2 border-dashed hover:border-blue-500 hover:bg-blue-50 rounded-lg cursor-pointer transition-all">
                       <div className="flex flex-col justify-center items-center pt-5 pb-6">
                         <svg className="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                          />
                         </svg>
                         <p className="text-sm text-gray-500 mt-2">
-                          {certificateFile ? certificateFile.name : 'Click to upload certificate'}
+                          {certificateFile ? certificateFile.name : "Click to upload certificate"}
                         </p>
                       </div>
                       <input
@@ -250,28 +317,30 @@ export default function RegistrationForm() {
                   {certificatePreviewUrl && (
                     <div className="mt-3 border rounded-lg p-2">
                       <p className="text-sm text-gray-600 mb-2">Preview:</p>
-                      <img src={certificatePreviewUrl} className="max-h-40 mx-auto object-contain" alt="Certificate preview" />
+                      <img
+                        src={certificatePreviewUrl || "/placeholder.svg"}
+                        className="max-h-40 mx-auto object-contain"
+                        alt="Certificate preview"
+                      />
                     </div>
                   )}
                 </div>
                 {/* ISO Upload */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    ISO Certificate {registrationType === 'vendor' ? '(Optional)' : '*'}
+                    ISO Certificate {registrationType === "vendor" ? "(Optional)" : "*"}
                   </label>
                   <input
                     type="file"
                     accept="image/*,application/pdf"
                     onChange={(e) => setIsoFile(e.target.files?.[0] || null)}
                     className="mt-1 block w-full text-sm text-gray-500"
-                    required={registrationType === 'manufacture'}
+                    required={registrationType === "manufacture"}
                   />
                 </div>
                 {/* GST No */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    GST No *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">GST No *</label>
                   <input
                     type="text"
                     value={gstNo}
@@ -281,15 +350,110 @@ export default function RegistrationForm() {
                     placeholder="GST Number"
                   />
                 </div>
+                {/* Company Logo Upload */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Company Logo (300px x 300px, under 500KB) *
+                  </label>
+                  <div className="mt-1 flex justify-center items-center w-full">
+                    <label className="flex flex-col w-full h-32 border-2 border-dashed hover:border-blue-500 hover:bg-blue-50 rounded-lg cursor-pointer transition-all">
+                      <div className="flex flex-col justify-center items-center pt-5 pb-6">
+                        <svg className="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9"
+                          />
+                        </svg>
+                        <p className="text-sm text-gray-500 mt-2">
+                          {logoFile ? logoFile.name : "Click to upload logo"}
+                        </p>
+                      </div>
+                      <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" required />
+                    </label>
+                  </div>
+                  {logoPreviewUrl && (
+                    <div className="mt-3 border rounded-lg p-2">
+                      <p className="text-sm text-gray-600 mb-2">Logo Preview:</p>
+                      <img
+                        src={logoPreviewUrl || "/placeholder.svg"}
+                        className="max-h-40 mx-auto object-contain"
+                        alt="Logo preview"
+                      />
+                    </div>
+                  )}
+                </div>
+                {/* Account Details */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Account Number *</label>
+                  <input
+                    type="text"
+                    value={accountNumber}
+                    onChange={(e) => setAccountNumber(e.target.value)}
+                    required
+                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    placeholder="Account Number"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Bank Name *</label>
+                  <input
+                    type="text"
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                    required
+                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    placeholder="Bank Name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">IFSC Code *</label>
+                  <input
+                    type="text"
+                    value={ifscCode}
+                    onChange={(e) => setIfscCode(e.target.value)}
+                    required
+                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    placeholder="IFSC Code"
+                  />
+                </div>
+                {/* Delivery Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Delivery Type *</label>
+                  <select
+                    value={deliveryType}
+                    onChange={(e) => setDeliveryType(e.target.value as "self" | "organiza")}
+                    required
+                    className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  >
+                    <option value="self">Self Delivery</option>
+                    <option value="organiza">Delivery by Organiza</option>
+                  </select>
+                </div>
+                {/* Estimated Delivery Time (if Self Delivery) */}
+                {deliveryType === "self" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Estimated Delivery Time (e.g., 24-48hr) *
+                    </label>
+                    <input
+                      type="text"
+                      value={estimatedDeliveryTime}
+                      onChange={(e) => setEstimatedDeliveryTime(e.target.value)}
+                      required={deliveryType === "self"}
+                      className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      placeholder="Estimated Delivery Time"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Right Column - Contact Details */}
               <div className="space-y-5">
                 {/* Company Person Name */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Company Person Name *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Company Person Name *</label>
                   <input
                     type="text"
                     value={companyPersonName}
@@ -301,9 +465,7 @@ export default function RegistrationForm() {
                 </div>
                 {/* Mobile Number */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Mobile Number *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Mobile Number *</label>
                   <input
                     type="tel"
                     value={mobileNumber}
@@ -315,9 +477,7 @@ export default function RegistrationForm() {
                 </div>
                 {/* Alternate Number */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Alternate Number *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Alternate Number *</label>
                   <input
                     type="tel"
                     value={alternateNumber}
@@ -329,9 +489,7 @@ export default function RegistrationForm() {
                 </div>
                 {/* Email */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Email Address *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Email Address *</label>
                   <input
                     type="email"
                     value={email}
@@ -343,9 +501,7 @@ export default function RegistrationForm() {
                 </div>
                 {/* Password */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Password *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Password *</label>
                   <input
                     type="password"
                     value={password}
@@ -361,9 +517,7 @@ export default function RegistrationForm() {
               <div className="md:col-span-2 space-y-5">
                 {/* Company Website (Optional) */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Company Website (Optional)
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Company Website (Optional)</label>
                   <input
                     type="url"
                     value={companyWebsite}
@@ -374,9 +528,7 @@ export default function RegistrationForm() {
                 </div>
                 {/* Company Address */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Company Address *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Company Address *</label>
                   <textarea
                     value={companyAddress}
                     onChange={(e) => setCompanyAddress(e.target.value)}
@@ -396,14 +548,30 @@ export default function RegistrationForm() {
                 >
                   {loading ? (
                     <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      <svg
+                        className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
                       </svg>
                       Processing...
                     </>
                   ) : (
-                    'Complete Registration'
+                    "Complete Registration"
                   )}
                 </button>
               </div>
@@ -412,5 +580,6 @@ export default function RegistrationForm() {
         </div>
       </div>
     </div>
-  );
+  )
 }
+ 

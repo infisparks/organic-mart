@@ -142,26 +142,31 @@ function CategoryCarousel({ selectedCategory, onCategoryClick }: CategoryProps) 
   };
 
   return (
-    <section className="py-10 bg-white">
+    <section className="py-3 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold text-gray-900">Shop by Category</h2>
+        <div className="flex items-center justify-between ">
+          {/* <h2 className="text-2xl font-bold text-gray-900">Shop by Category</h2>
           <Button variant="ghost" className="text-green-600 hover:text-green-700 gap-1">
             All Categories <ArrowRight className="w-4 h-4" />
-          </Button>
+          </Button> */}
         </div>
         <Slider {...settings} className="category-slider">
           {categories.map((cat) => (
-            <div key={cat.id} className="px-2 cursor-pointer" onClick={() => onCategoryClick(cat.title)}>
-              <Card className={`h-full transition-all duration-300 hover:shadow-md ${
-                selectedCategory === cat.title ? "ring-2 ring-green-500 shadow-md" : ""
-              }`}>
-                <CardContent className="p-6 flex flex-col items-center text-center">
-                  <div className="w-12 h-12 flex items-center justify-center bg-green-100 rounded-full mb-4 text-2xl">
+            <div
+              key={cat.id}
+              className="px-2 cursor-pointer"
+              onClick={() => onCategoryClick(cat.title)}
+            >
+              <Card
+                className={`h-max transition-all duration-300 hover:shadow-md ${
+                  selectedCategory === cat.title ? "ring-2 ring-green-500 shadow-md" : ""
+                }`}
+              >
+                <CardContent className="p-4 flex items-center">
+                  <div className="w-12 h-12 flex items-center justify-center bg-green-100 rounded-full mr-4 text-2xl">
                     {cat.icon}
                   </div>
                   <h3 className="font-medium text-gray-900">{cat.title}</h3>
-                  <p className="text-sm text-gray-500 mt-1">{cat.subtitle}</p>
                 </CardContent>
               </Card>
             </div>
