@@ -1,134 +1,121 @@
-"use client";
+"use client"
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import Image from "next/image";
-import { auth, database } from "../../lib/firebase";
-import {
-  onValue,
-  ref as dbRef,
-  update,
-  remove,
-  push,
-} from "firebase/database";
-import { onAuthStateChanged } from "firebase/auth";
-import {
-  Leaf,
-  Minus,
-  Plus,
-  ArrowLeft,
-  Trash2,
-  ShieldCheck,
-  Truck,
-  Clock,
-} from "lucide-react";
-import Header from "../components/Header";
-import Footer from "../components/Footer";
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import Image from "next/image"
+import { auth, database } from "../../lib/firebase"
+import { onValue, ref as dbRef, update, remove, push } from "firebase/database"
+import { onAuthStateChanged } from "firebase/auth"
+import { Minus, Plus, ArrowLeft, Trash2, ShieldCheck, Truck, Clock } from "lucide-react"
+import Header from "../components/Header"
+import Footer from "../components/Footer"
+import RazorpayPayment from "../components/razorpay-payment"
 
 interface CartItem {
-  id: string;
-  productId?: string;
-  name: string;
-  description: string;
-  price: number;
-  originalPrice: number;
-  quantity: number;
-  image: string;
-  nutrients: Array<{ name: string; value: string }>;
+  id: string
+  productId?: string
+  name: string
+  description: string
+  price: number
+  originalPrice: number
+  quantity: number
+  image: string
+  nutrients: Array<{ name: string; value: string }>
 }
 
 interface CompanyProduct {
-  productName: string;
-  productDescription: string;
-  originalPrice: number;
-  discountPrice: number;
-  productPhotoUrls: string[];
-  nutrients: Array<{ name: string; value: string }>;
+  productName: string
+  productDescription: string
+  originalPrice: number
+  discountPrice: number
+  productPhotoUrls: string[]
+  nutrients: Array<{ name: string; value: string }>
 }
 
 interface CompaniesData {
   [companyId: string]: {
-    companyName: string;
-    companyPhotoUrl: string;
-    email: string;
-    phoneNumber: string;
+    companyName: string
+    companyPhotoUrl: string
+    email: string
+    phoneNumber: string
     products: {
-      [productId: string]: CompanyProduct;
-    };
-  };
+      [productId: string]: CompanyProduct
+    }
+  }
 }
 
 export default function CartPage() {
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [companies, setCompanies] = useState<CompaniesData>({});
-  const [showAddressModal, setShowAddressModal] = useState(false);
-  const [address, setAddress] = useState("");
-  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [orderPlaced, setOrderPlaced] = useState(false);
-  const router = useRouter();
+  const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const [companies, setCompanies] = useState<CompaniesData>({})
+  const [showAddressModal, setShowAddressModal] = useState(false)
+  const [address, setAddress] = useState("")
+  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [orderPlaced, setOrderPlaced] = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const router = useRouter()
 
   // Load companies data from Firebase.
   useEffect(() => {
-    const companiesRef = dbRef(database, "companies");
+    const companiesRef = dbRef(database, "companies")
     const unsubscribeCompanies = onValue(companiesRef, (snapshot) => {
       if (snapshot.exists()) {
-        setCompanies(snapshot.val());
+        setCompanies(snapshot.val())
       } else {
-        setCompanies({});
+        setCompanies({})
       }
-    });
-    return () => unsubscribeCompanies();
-  }, []);
+    })
+    return () => unsubscribeCompanies()
+  }, [])
 
   // Helper: Find a matching company product using the productId.
   const getCompanyProduct = (productId: string): CompanyProduct | null => {
     for (const companyId in companies) {
-      const company = companies[companyId];
+      const company = companies[companyId]
       if (company.products && company.products[productId]) {
-        return company.products[productId];
+        return company.products[productId]
       }
     }
-    return null;
-  };
+    return null
+  }
 
   // Helper: Get product thumbnail from companies data.
   const getProductThumbnail = (productId: string): string | null => {
-    const companyProduct = getCompanyProduct(productId);
+    const companyProduct = getCompanyProduct(productId)
     if (
       companyProduct &&
       companyProduct.productPhotoUrls &&
       Array.isArray(companyProduct.productPhotoUrls) &&
       companyProduct.productPhotoUrls.length > 0
     ) {
-      return companyProduct.productPhotoUrls[0];
+      return companyProduct.productPhotoUrls[0]
     }
-    return null;
-  };
+    return null
+  }
 
   // Load cart and profile data once the user is authenticated.
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (user) {
         // Fetch default address from user profile.
-        const profileRef = dbRef(database, `user/${user.uid}/profile`);
+        const profileRef = dbRef(database, `user/${user.uid}/profile`)
         onValue(profileRef, (snapshot) => {
           if (snapshot.exists()) {
-            const profileData = snapshot.val();
-            setAddress(profileData.address || "");
+            const profileData = snapshot.val()
+            setAddress(profileData.address || "")
           }
-        });
+        })
 
-        const cartRef = dbRef(database, `user/${user.uid}/addtocart`);
+        const cartRef = dbRef(database, `user/${user.uid}/addtocart`)
         const unsubscribeCart = onValue(cartRef, (snapshot) => {
           if (snapshot.exists()) {
-            const data = snapshot.val();
+            const data = snapshot.val()
             const loadedItems: CartItem[] = Object.keys(data).map((key) => {
-              const itemData = data[key];
-              const productId = itemData.productId || key;
-              const thumbnailFromCompany = getProductThumbnail(productId);
-              const companyProduct = getCompanyProduct(productId);
+              const itemData = data[key]
+              const productId = itemData.productId || key
+              const thumbnailFromCompany = getProductThumbnail(productId)
+              const companyProduct = getCompanyProduct(productId)
               return {
                 id: key,
                 productId,
@@ -143,50 +130,48 @@ export default function CartPage() {
                   itemData.image ||
                   "https://via.placeholder.com/150",
                 nutrients: itemData.nutrients || [],
-              };
-            });
-            setCartItems(loadedItems);
+              }
+            })
+            setCartItems(loadedItems)
           } else {
-            setCartItems([]);
+            setCartItems([])
           }
-        });
-        return () => unsubscribeCart();
+        })
+        return () => unsubscribeCart()
       } else {
-        setCartItems([]);
+        setCartItems([])
       }
-    });
-    return () => unsubscribeAuth();
-  }, [companies]);
+    })
+    return () => unsubscribeAuth()
+  }, [companies])
 
   // Update quantity in Firebase and local state.
   const updateQuantity = async (id: string, newQuantity: number) => {
-    if (newQuantity < 1) return;
-    setCartItems((items) =>
-      items.map((item) => (item.id === id ? { ...item, quantity: newQuantity } : item))
-    );
-    const user = auth.currentUser;
-    if (!user) return;
-    const cartItemRef = dbRef(database, `user/${user.uid}/addtocart/${id}`);
-    await update(cartItemRef, { quantity: newQuantity });
-  };
+    if (newQuantity < 1) return
+    setCartItems((items) => items.map((item) => (item.id === id ? { ...item, quantity: newQuantity } : item)))
+    const user = auth.currentUser
+    if (!user) return
+    const cartItemRef = dbRef(database, `user/${user.uid}/addtocart/${id}`)
+    await update(cartItemRef, { quantity: newQuantity })
+  }
 
   // Remove an item from the cart.
   const removeItem = async (id: string) => {
-    setCartItems((items) => items.filter((item) => item.id !== id));
-    const user = auth.currentUser;
-    if (!user) return;
-    const cartItemRef = dbRef(database, `user/${user.uid}/addtocart/${id}`);
-    await remove(cartItemRef);
-  };
+    setCartItems((items) => items.filter((item) => item.id !== id))
+    const user = auth.currentUser
+    if (!user) return
+    const cartItemRef = dbRef(database, `user/${user.uid}/addtocart/${id}`)
+    await remove(cartItemRef)
+  }
 
-  const shipping = 99;
-  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const total = subtotal + shipping;
+  const shipping = 99
+  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const total = subtotal + shipping
 
   // Order placement function that pushes the order including address and location.
   const handleCheckout = async () => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return;
+    const currentUser = auth.currentUser
+    if (!currentUser) return
     try {
       const orderData = {
         items: cartItems,
@@ -197,56 +182,73 @@ export default function CartPage() {
         purchaseTime: Date.now(),
         shippingAddress: address,
         location, // contains latitude and longitude
-      };
+      }
       // Push order to orders node.
-      const orderRef = dbRef(database, `user/${currentUser.uid}/order`);
-      await push(orderRef, orderData);
+      const orderRef = dbRef(database, `user/${currentUser.uid}/order`)
+      await push(orderRef, orderData)
       // Clear cart.
-      const cartRef = dbRef(database, `user/${currentUser.uid}/addtocart`);
-      await remove(cartRef);
-      setCartItems([]);
+      const cartRef = dbRef(database, `user/${currentUser.uid}/addtocart`)
+      await remove(cartRef)
+      setCartItems([])
     } catch (error) {
-      console.error("Error during checkout:", error);
+      console.error("Error during checkout:", error)
     }
-  };
+  }
 
   // Function to fetch geolocation and then place the order if successful.
   const handlePlaceOrder = () => {
     if (cartItems.length === 0) {
-      alert("Your cart is empty. Please add products to your cart.");
-      return;
+      alert("Your cart is empty. Please add products to your cart.")
+      return
     }
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser.");
-      return;
+      alert("Geolocation is not supported by your browser.")
+      return
     }
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        setLocation({ latitude, longitude });
-        setLoading(true);
-        setTimeout(async () => {
-          await handleCheckout();
-          setLoading(false);
-          setOrderPlaced(true);
-        }, 1500);
+      (position) => {
+        const { latitude, longitude } = position.coords
+        setLocation({ latitude, longitude })
+        setShowAddressModal(false)
+
+        // Show Razorpay payment after getting location
+        setShowPaymentModal(true)
       },
       (error) => {
-        console.error("Geolocation error:", error);
-        alert("Could not fetch location. Please enable location services and try again.");
-      }
-    );
-  };
+        console.error("Geolocation error:", error)
+        alert("Could not fetch location. Please enable location services and try again.")
+      },
+    )
+  }
+
+  const handlePaymentSuccess = async (response: any) => {
+    console.log("Payment successful", response)
+    setLoading(true)
+    try {
+      await handleCheckout()
+      setLoading(false)
+      setOrderPlaced(true)
+      setShowPaymentModal(false)
+      setShowAddressModal(true) // Show success message
+    } catch (error) {
+      console.error("Error during checkout:", error)
+      setLoading(false)
+      alert("There was an error processing your order. Please try again.")
+    }
+  }
+
+  const handlePaymentFailure = (error: any) => {
+    console.error("Payment failed", error)
+    alert(`Payment failed: ${error.description}`)
+    setShowPaymentModal(false)
+  }
 
   return (
     <main className="min-h-screen bg-gray-50">
       <Header />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         <div className="flex items-center gap-2 mb-8">
-          <Link
-            href="/"
-            className="text-green-600 hover:text-green-700 flex items-center gap-2 group"
-          >
+          <Link href="/" className="text-green-600 hover:text-green-700 flex items-center gap-2 group">
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             Continue Shopping
           </Link>
@@ -274,7 +276,7 @@ export default function CartPage() {
                     {/* Updated Image Container: 1:1 aspect ratio and centered */}
                     <div className="relative w-full sm:w-40 aspect-square">
                       <Image
-                        src={item.image}
+                        src={item.image || "/placeholder.svg"}
                         alt={item.name}
                         fill
                         className="object-contain object-center rounded-lg"
@@ -283,14 +285,10 @@ export default function CartPage() {
                     <div className="flex-1 space-y-4">
                       <div className="flex justify-between">
                         <div>
-                          <h3 className="text-lg font-semibold text-gray-900">
-                            {item.name}
-                          </h3>
+                          <h3 className="text-lg font-semibold text-gray-900">{item.name}</h3>
                           <p className="text-sm text-gray-500">{item.description}</p>
                           {item.originalPrice > item.price && (
-                            <p className="text-sm text-gray-500">
-                              Original Price: ₹{item.originalPrice}
-                            </p>
+                            <p className="text-sm text-gray-500">Original Price: ₹{item.originalPrice}</p>
                           )}
                         </div>
                         <button
@@ -313,29 +311,21 @@ export default function CartPage() {
                       <div className="flex flex-wrap items-center justify-between gap-4">
                         <div className="flex items-center gap-3 bg-gray-50 rounded-full p-1">
                           <button
-                            onClick={() =>
-                              updateQuantity(item.id, item.quantity - 1)
-                            }
+                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
                             className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
                           >
                             <Minus className="w-4 h-4" />
                           </button>
-                          <span className="w-8 text-center font-medium">
-                            {item.quantity}
-                          </span>
+                          <span className="w-8 text-center font-medium">{item.quantity}</span>
                           <button
-                            onClick={() =>
-                              updateQuantity(item.id, item.quantity + 1)
-                            }
+                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
                             className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
                           >
                             <Plus className="w-4 h-4" />
                           </button>
                         </div>
                         <div className="flex items-baseline gap-2">
-                          <span className="text-2xl font-bold text-gray-900">
-                            ₹{item.price * item.quantity}
-                          </span>
+                          <span className="text-2xl font-bold text-gray-900">₹{item.price * item.quantity}</span>
                           {item.originalPrice > item.price && (
                             <span className="text-sm text-gray-400 line-through">
                               ₹{item.originalPrice * item.quantity}
@@ -353,9 +343,7 @@ export default function CartPage() {
           {/* Order Summary */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-xl p-6 shadow-sm sticky top-4">
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">
-                Order Summary
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-6">Order Summary</h2>
 
               <div className="space-y-4 mb-6">
                 <div className="flex justify-between text-gray-600">
@@ -374,9 +362,9 @@ export default function CartPage() {
 
               <button
                 onClick={() => {
-                  setShowAddressModal(true);
-                  setOrderPlaced(false);
-                  setLoading(false);
+                  setShowAddressModal(true)
+                  setOrderPlaced(false)
+                  setLoading(false)
                 }}
                 className="w-full bg-green-600 text-white py-4 rounded-full font-medium hover:bg-green-700 transform hover:scale-[1.02] transition-all duration-300"
               >
@@ -448,7 +436,34 @@ export default function CartPage() {
           </div>
         </div>
       )}
+      {/* Razorpay Payment Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h2 className="text-2xl font-bold mb-4">Complete Payment</h2>
+            <p className="mb-4">Total amount: ₹{total}</p>
+            <RazorpayPayment
+              amount={total}
+              name="Organic Store"
+              description="Purchase of organic products"
+              prefill={{
+                name: auth.currentUser?.displayName || "",
+                email: auth.currentUser?.email || "",
+                address: address,
+              }}
+              onSuccess={handlePaymentSuccess}
+              onFailure={handlePaymentFailure}
+            />
+            <button
+              onClick={() => setShowPaymentModal(false)}
+              className="mt-4 w-full text-gray-600 hover:text-gray-800"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
       <Footer />
     </main>
-  );
+  )
 }
