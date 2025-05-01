@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { AlertCircle, Plus, Trash2, Upload, X, Loader2 } from "lucide-react"
+import { AlertCircle, Plus, Trash2, Upload, X, Loader2 } from 'lucide-react'
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -77,7 +77,6 @@ interface FormData {
   productDescription: string
   originalPrice: string
   discountPrice: string
-  costPrice: string
   stockQuantity: string
   nutrients: Array<{ name: string; value: string }>
   categories: Array<{ main: string; sub: string }>
@@ -106,7 +105,6 @@ export default function AddProduct() {
       productDescription: "",
       originalPrice: "",
       discountPrice: "",
-      costPrice: "",
       stockQuantity: "",
       nutrients: [],
       categories: [],
@@ -253,7 +251,6 @@ export default function AddProduct() {
         productDescription: data.productDescription,
         originalPrice: parseFloat(data.originalPrice),
         discountPrice: parseFloat(data.discountPrice),
-        costPrice: parseFloat(data.costPrice),
         stockQuantity: parseInt(data.stockQuantity, 10),
         nutrients: data.nutrients,
         categories: data.categories,
@@ -337,7 +334,7 @@ export default function AddProduct() {
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium">Price Details</h3>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="originalPrice">Original Price (₹)</Label>
                       <Input
@@ -371,24 +368,6 @@ export default function AddProduct() {
                       />
                       {errors.discountPrice && (
                         <p className="text-red-500 text-xs mt-1">{errors.discountPrice.message}</p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="costPrice">Cost Price (₹)</Label>
-                      <Input
-                        id="costPrice"
-                        type="number"
-                        step="0.01"
-                        {...register("costPrice", {
-                          required: "Cost price is required",
-                          min: { value: 0, message: "Price cannot be negative" },
-                        })}
-                        placeholder="e.g. 80.00"
-                        className={cn(errors.costPrice && "border-red-500")}
-                      />
-                      {errors.costPrice && (
-                        <p className="text-red-500 text-xs mt-1">{errors.costPrice.message}</p>
                       )}
                     </div>
                   </div>
