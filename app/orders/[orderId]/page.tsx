@@ -1,5 +1,10 @@
+// app/orders/[orderId]/page.tsx
 import OrderDetailClient from "./OrderDetailClient";
 
-export default function OrderDetailPage({ params }: { params: { orderId: string } }) {
+export default function OrderDetailPage({
+  params,
+}: {
+  params: { orderId: string };
+}) {
   return <OrderDetailClient orderId={params.orderId} />;
 }

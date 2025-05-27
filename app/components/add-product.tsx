@@ -3,7 +3,9 @@
 import type React from "react"
 import { useRef, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useForm, useFieldArray } from "react-hook-form"
+import { useForm, useFieldArray ,Controller } from "react-hook-form"
+
+
 import { database, auth } from "../../lib/firebase"
 import { ref as dbRef, push, set } from "firebase/database"
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage"
@@ -31,6 +33,7 @@ import {
   CheckCircle2,
   ArrowLeft,
 } from "lucide-react"
+
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -576,17 +579,24 @@ export default function AddProduct() {
                       errors.weight && "border-red-500 focus:border-red-500",
                     )}
                   />
-                  <Select defaultValue="kg" {...register("weightUnit")}>
-                    <SelectTrigger className="w-24 rounded-l-none h-11">
-                      <SelectValue placeholder="Unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="kg">kg</SelectItem>
-                      <SelectItem value="g">g</SelectItem>
-                      <SelectItem value="lb">lb</SelectItem>
-                      <SelectItem value="oz">oz</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <Controller
+  control={control}
+  name="weightUnit"
+  render={({ field }) => (
+    <Select value={field.value} onValueChange={field.onChange}>
+      <SelectTrigger className="w-24 rounded-l-none h-11">
+        <SelectValue placeholder="Unit" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="kg">kg</SelectItem>
+        <SelectItem value="g">g</SelectItem>
+        <SelectItem value="lb">lb</SelectItem>
+        <SelectItem value="oz">oz</SelectItem>
+      </SelectContent>
+    </Select>
+  )}
+/>
+
                 </div>
                 {errors.weight && (
                   <p className="text-red-500 text-sm flex items-center gap-1">
@@ -680,17 +690,24 @@ export default function AddProduct() {
                 <Label htmlFor="dimensionUnit" className="text-sm font-medium">
                   Dimension Unit
                 </Label>
-                <Select defaultValue="cm" {...register("dimensionUnit")}>
-                  <SelectTrigger className="w-full h-11">
-                    <SelectValue placeholder="Unit" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cm">cm</SelectItem>
-                    <SelectItem value="m">m</SelectItem>
-                    <SelectItem value="in">in</SelectItem>
-                    <SelectItem value="ft">ft</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Controller
+  control={control}
+  name="dimensionUnit"
+  render={({ field }) => (
+    <Select value={field.value} onValueChange={field.onChange}>
+      <SelectTrigger className="w-full h-11">
+        <SelectValue placeholder="Unit" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="cm">cm</SelectItem>
+        <SelectItem value="m">m</SelectItem>
+        <SelectItem value="in">in</SelectItem>
+        <SelectItem value="ft">ft</SelectItem>
+      </SelectContent>
+    </Select>
+  )}
+/>
+
               </div>
             </div>
           </div>
