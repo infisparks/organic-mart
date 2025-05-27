@@ -2,11 +2,11 @@
 
 import type React from "react"
 import { useRef, useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import { useForm, useFieldArray } from "react-hook-form"
-import { database, auth } from "../../lib/firebase"
-import { ref as dbRef, push, set } from "firebase/database"
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage"
+import { database, auth } from "../../../../lib/firebase"
+import { ref as dbRef, get, update } from "firebase/database"
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -30,10 +30,13 @@ import {
   Eye,
   CheckCircle2,
   ArrowLeft,
+  Save,
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import Link from "next/link"
+import { onAuthStateChanged } from "firebase/auth"
 
 const availableNutrients = ["Protein", "Fat", "Carbs", "Fiber", "Calcium", "Iron", "Vitamin C", "Vitamin D"]
 
@@ -104,6 +107,27 @@ interface FormData {
   categories: Array<{ main: string; sub: string }>
 }
 
+interface Product {
+  id: string
+  productName?: string
+  productDescription?: string
+  originalPrice?: number
+  discountPrice?: number
+  stockQuantity?: number
+  productPhotoUrls?: string[]
+  nutrients?: Array<{ name: string; value: string }>
+  categories?: Array<{ main: string; sub: string }>
+  dimensions?: {
+    weight?: number
+    weightUnit?: string
+    length?: number
+    width?: number
+    height?: number
+    dimensionUnit?: string
+  }
+  createdAt?: number
+}
+
 const formSteps = [
   { id: "basic", title: "Basic Info", icon: Package },
   { id: "pricing", title: "Pricing", icon: DollarSign },
@@ -112,18 +136,15 @@ const formSteps = [
   { id: "images", title: "Images", icon: Camera },
 ]
 
-export default function AddProduct() {
+export default function EditProduct() {
   const router = useRouter()
+  const params = useParams()
+  const productId = params?.id as string
   const { toast } = useToast()
   const [currentStep, setCurrentStep] = useState(0)
   const [completedSteps, setCompletedSteps] = useState<number[]>([])
-
-  // Redirect to /login if user is not authenticated.
-  useEffect(() => {
-    if (!auth.currentUser) {
-      router.push("/login")
-    }
-  }, [router])
+  const [loading, setLoading] = useState(true)
+  const [product, setProduct] = useState<Product | null>(null)
 
   const {
     register,
@@ -131,6 +152,7 @@ export default function AddProduct() {
     control,
     watch,
     trigger,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     defaultValues: {
@@ -155,12 +177,14 @@ export default function AddProduct() {
     fields: nutrientFields,
     append: appendNutrient,
     remove: removeNutrient,
+    replace: replaceNutrients,
   } = useFieldArray({ control, name: "nutrients" })
 
   const {
     fields: categoryFields,
     append: appendCategory,
     remove: removeCategory,
+    replace: replaceCategories,
   } = useFieldArray({ control, name: "categories" })
 
   // Local states for nutrient and category selection.
@@ -173,6 +197,8 @@ export default function AddProduct() {
 
   // Local state for image uploads.
   const [selectedImages, setSelectedImages] = useState<File[]>([])
+  const [existingImages, setExistingImages] = useState<string[]>([])
+  const [imagesToDelete, setImagesToDelete] = useState<string[]>([])
   const [error, setError] = useState("")
   const [isDragOver, setIsDragOver] = useState(false)
 
@@ -184,6 +210,106 @@ export default function AddProduct() {
 
   // Calculate progress
   const progress = ((currentStep + 1) / formSteps.length) * 100
+
+  // Load product data
+  useEffect(() => {
+    const loadProduct = async () => {
+      // Wait for auth state to be determined
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+          router.push("/login")
+          return
+        }
+
+        if (!productId) {
+          toast({
+            title: "Invalid product ID",
+            description: "No product ID provided",
+            variant: "destructive",
+          })
+          router.push("/dashboard/my-product")
+          return
+        }
+
+        try {
+          const uid = user.uid
+          const productRef = dbRef(database, `companies/${uid}/products/${productId}`)
+          const snapshot = await get(productRef)
+
+          if (snapshot.exists()) {
+            const productData = { id: productId, ...snapshot.val() } as Product
+            setProduct(productData)
+
+            // Safely populate form with existing data, providing defaults for undefined values
+            setValue("productName", productData.productName || "")
+            setValue("productDescription", productData.productDescription || "")
+            setValue("originalPrice", productData.originalPrice?.toString() || "0")
+            setValue("discountPrice", productData.discountPrice?.toString() || "0")
+            setValue("stockQuantity", productData.stockQuantity?.toString() || "0")
+
+            // Handle dimensions with safe defaults
+            if (productData.dimensions) {
+              setValue("weight", productData.dimensions.weight?.toString() || "0")
+              setValue("weightUnit", productData.dimensions.weightUnit || "kg")
+              setValue("length", productData.dimensions.length?.toString() || "0")
+              setValue("width", productData.dimensions.width?.toString() || "0")
+              setValue("height", productData.dimensions.height?.toString() || "0")
+              setValue("dimensionUnit", productData.dimensions.dimensionUnit || "cm")
+            } else {
+              // Set default dimensions if none exist
+              setValue("weight", "0")
+              setValue("weightUnit", "kg")
+              setValue("length", "0")
+              setValue("width", "0")
+              setValue("height", "0")
+              setValue("dimensionUnit", "cm")
+            }
+
+            // Handle nutrients and categories safely
+            if (productData.nutrients && Array.isArray(productData.nutrients)) {
+              replaceNutrients(productData.nutrients)
+            } else {
+              replaceNutrients([])
+            }
+
+            if (productData.categories && Array.isArray(productData.categories)) {
+              replaceCategories(productData.categories)
+            } else {
+              replaceCategories([])
+            }
+
+            // Handle product images safely
+            if (productData.productPhotoUrls && Array.isArray(productData.productPhotoUrls)) {
+              setExistingImages(productData.productPhotoUrls)
+            } else {
+              setExistingImages([])
+            }
+          } else {
+            toast({
+              title: "Product not found",
+              description: "The product you're trying to edit doesn't exist",
+              variant: "destructive",
+            })
+            router.push("/dashboard/my-product")
+          }
+        } catch (error: any) {
+          console.error("Error loading product:", error)
+          toast({
+            title: "Error",
+            description: "Failed to load product data",
+            variant: "destructive",
+          })
+          router.push("/dashboard/my-product")
+        } finally {
+          setLoading(false)
+        }
+      })
+
+      return () => unsubscribe()
+    }
+
+    loadProduct()
+  }, [productId, router, setValue, replaceNutrients, replaceCategories, toast])
 
   // Step validation
   const validateStep = async (step: number) => {
@@ -203,9 +329,9 @@ export default function AddProduct() {
         isValid = true
         break
       case 4: // Images
-        isValid = selectedImages.length >= 1
+        isValid = existingImages.length + selectedImages.length >= 1
         if (!isValid) {
-          setError("Please upload at least 1 product image")
+          setError("Please keep at least 1 product image")
         }
         break
     }
@@ -279,11 +405,12 @@ export default function AddProduct() {
     const files = e.target.files
     if (files) {
       const fileArray = Array.from(files)
-      if (fileArray.length > 5) {
-        setError("You can upload maximum 5 images.")
+      const totalImages = existingImages.length + selectedImages.length + fileArray.length
+      if (totalImages > 5) {
+        setError("You can have maximum 5 images total.")
         return
       }
-      setSelectedImages((prev) => [...prev, ...fileArray].slice(0, 5))
+      setSelectedImages((prev) => [...prev, ...fileArray])
       setError("")
     }
   }
@@ -297,11 +424,12 @@ export default function AddProduct() {
     const files = e.dataTransfer.files
     if (files) {
       const fileArray = Array.from(files)
-      if (fileArray.length > 5) {
-        setError("You can upload maximum 5 images.")
+      const totalImages = existingImages.length + selectedImages.length + fileArray.length
+      if (totalImages > 5) {
+        setError("You can have maximum 5 images total.")
         return
       }
-      setSelectedImages((prev) => [...prev, ...fileArray].slice(0, 5))
+      setSelectedImages((prev) => [...prev, ...fileArray])
       setError("")
     }
   }
@@ -319,21 +447,27 @@ export default function AddProduct() {
     setIsDragOver(false)
   }
 
-  // Remove image from preview.
-  const handleRemoveImage = (index: number) => {
+  // Remove new image from preview.
+  const handleRemoveNewImage = (index: number) => {
     setSelectedImages((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  // Mark existing image for deletion
+  const handleRemoveExistingImage = (imageUrl: string) => {
+    setExistingImages((prev) => prev.filter((url) => url !== imageUrl))
+    setImagesToDelete((prev) => [...prev, imageUrl])
   }
 
   // Form submission handler.
   const onSubmit = async (data: FormData) => {
-    // Double-check authentication (in case the user logs out mid-session).
-    if (!auth.currentUser) {
+    if (!auth.currentUser || !productId) {
       router.push("/login")
       return
     }
 
-    if (selectedImages.length < 1) {
-      setError("Please upload at least 1 image.")
+    const totalImages = existingImages.length + selectedImages.length
+    if (totalImages < 1) {
+      setError("Please keep at least 1 image.")
       return
     }
 
@@ -341,15 +475,28 @@ export default function AddProduct() {
       const storage = getStorage()
       const uid = auth.currentUser.uid
 
-      // Upload images to Firebase Storage.
+      // Delete removed images from storage
+      for (const imageUrl of imagesToDelete) {
+        try {
+          const imageRef = storageRef(storage, imageUrl)
+          await deleteObject(imageRef)
+        } catch (error) {
+          console.warn("Failed to delete image:", imageUrl, error)
+        }
+      }
+
+      // Upload new images to Firebase Storage.
       const uploadPromises = selectedImages.map((file) => {
         const filePath = `product-photos/${crypto.randomUUID()}`
         const fileRef = storageRef(storage, filePath)
         return uploadBytes(fileRef, file).then((snapshot) => getDownloadURL(snapshot.ref))
       })
-      const productPhotoUrls = await Promise.all(uploadPromises)
+      const newImageUrls = await Promise.all(uploadPromises)
 
-      // Prepare product data matching your JSON structure.
+      // Combine existing and new image URLs
+      const allImageUrls = [...existingImages, ...newImageUrls]
+
+      // Prepare product data
       const productData = {
         productName: data.productName,
         productDescription: data.productDescription,
@@ -366,25 +513,24 @@ export default function AddProduct() {
         },
         nutrients: data.nutrients,
         categories: data.categories,
-        productPhotoUrls,
-        createdAt: Date.now(),
+        productPhotoUrls: allImageUrls,
+        updatedAt: Date.now(),
       }
 
-      // Push to `companies/{uid}/products`
-      const productRef = dbRef(database, `companies/${uid}/products`)
-      const newProductRef = push(productRef)
-      await set(newProductRef, productData)
+      // Update product in database
+      const productRef = dbRef(database, `companies/${uid}/products/${productId}`)
+      await update(productRef, productData)
 
       toast({
-        title: "Success!",
-        description: "Product added successfully",
+        title: "Product updated!",
+        description: "Your product has been successfully updated",
         variant: "default",
       })
 
       router.push("/dashboard/my-product")
     } catch (error: any) {
-      console.error("Error adding product:", error)
-      setError(error.message || "Error adding product. Please try again.")
+      console.error("Error updating product:", error)
+      setError(error.message || "Error updating product. Please try again.")
     }
   }
 
@@ -576,7 +722,7 @@ export default function AddProduct() {
                       errors.weight && "border-red-500 focus:border-red-500",
                     )}
                   />
-                  <Select defaultValue="kg" {...register("weightUnit")}>
+                  <Select value={watchedValues.weightUnit} onValueChange={(value) => setValue("weightUnit", value)}>
                     <SelectTrigger className="w-24 rounded-l-none h-11">
                       <SelectValue placeholder="Unit" />
                     </SelectTrigger>
@@ -680,7 +826,7 @@ export default function AddProduct() {
                 <Label htmlFor="dimensionUnit" className="text-sm font-medium">
                   Dimension Unit
                 </Label>
-                <Select defaultValue="cm" {...register("dimensionUnit")}>
+                <Select value={watchedValues.dimensionUnit} onValueChange={(value) => setValue("dimensionUnit", value)}>
                   <SelectTrigger className="w-full h-11">
                     <SelectValue placeholder="Unit" />
                   </SelectTrigger>
@@ -838,10 +984,42 @@ export default function AddProduct() {
             <div>
               <h3 className="text-lg font-semibold mb-2">Product Images</h3>
               <p className="text-sm text-muted-foreground">
-                Upload high-quality images to showcase your product (1-5 images required)
+                Upload high-quality images to showcase your product (1-5 images total)
               </p>
             </div>
 
+            {/* Existing Images */}
+            {existingImages.length > 0 && (
+              <div className="space-y-4">
+                <h4 className="font-medium">Current Images</h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                  {existingImages.map((imageUrl, index) => (
+                    <div key={index} className="relative group">
+                      <div className="aspect-square rounded-lg overflow-hidden border-2 border-gray-200">
+                        <img
+                          src={imageUrl || "/placeholder.svg"}
+                          alt={`Current ${index + 1}`}
+                          className="object-cover w-full h-full transition-transform group-hover:scale-105"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                        onClick={() => handleRemoveExistingImage(imageUrl)}
+                      >
+                        <X className="h-3 w-3" />
+                        <span className="sr-only">Remove image</span>
+                      </Button>
+                      {index === 0 && <Badge className="absolute bottom-2 left-2 text-xs">Primary</Badge>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Upload New Images */}
             <div
               onDrop={handleDrop}
               onDragOver={handleDragOver}
@@ -867,13 +1045,13 @@ export default function AddProduct() {
                 </div>
 
                 <h4 className="text-lg font-medium mb-2">
-                  {selectedImages.length > 0 ? `${selectedImages.length} image(s) selected` : "Upload Product Images"}
+                  {selectedImages.length > 0 ? `${selectedImages.length} new image(s) selected` : "Add More Images"}
                 </h4>
 
                 <p className="text-sm text-muted-foreground mb-4">Drag and drop images here or click to browse</p>
 
                 <p className="text-xs text-muted-foreground mb-6">
-                  Supports PNG, JPG, JPEG • Max 5 images • Recommended: 1000x1000px
+                  Supports PNG, JPG, JPEG • Max 5 images total • Recommended: 1000x1000px
                 </p>
 
                 <input
@@ -891,6 +1069,7 @@ export default function AddProduct() {
                   variant={selectedImages.length > 0 ? "outline" : "default"}
                   onClick={() => fileInputRef.current?.click()}
                   className="h-11"
+                  disabled={existingImages.length + selectedImages.length >= 5}
                 >
                   <Camera className="h-4 w-4 mr-2" />
                   {selectedImages.length > 0 ? "Add More Images" : "Select Images"}
@@ -898,16 +1077,17 @@ export default function AddProduct() {
               </div>
             </div>
 
+            {/* New Images Preview */}
             {selectedImages.length > 0 && (
               <div className="space-y-4">
-                <h4 className="font-medium">Image Preview</h4>
+                <h4 className="font-medium">New Images Preview</h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                   {selectedImages.map((file, index) => (
                     <div key={index} className="relative group">
                       <div className="aspect-square rounded-lg overflow-hidden border-2 border-gray-200">
                         <img
                           src={URL.createObjectURL(file) || "/placeholder.svg"}
-                          alt={`Preview ${index + 1}`}
+                          alt={`New ${index + 1}`}
                           className="object-cover w-full h-full transition-transform group-hover:scale-105"
                         />
                       </div>
@@ -916,12 +1096,14 @@ export default function AddProduct() {
                         variant="destructive"
                         size="icon"
                         className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                        onClick={() => handleRemoveImage(index)}
+                        onClick={() => handleRemoveNewImage(index)}
                       >
                         <X className="h-3 w-3" />
                         <span className="sr-only">Remove image</span>
                       </Button>
-                      {index === 0 && <Badge className="absolute bottom-2 left-2 text-xs">Primary</Badge>}
+                      <Badge variant="secondary" className="absolute bottom-2 left-2 text-xs">
+                        New
+                      </Badge>
                     </div>
                   ))}
                 </div>
@@ -935,18 +1117,35 @@ export default function AddProduct() {
     }
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+        <div className="container mx-auto py-8 px-4">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
+              <p className="text-lg text-gray-600">Loading product data...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <div className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-10 w-10">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
+              <Link href="/dashboard/my-product">
+                <Button variant="ghost" size="icon" className="h-10 w-10">
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+              </Link>
               <div>
-                <h1 className="text-2xl font-bold">Add New Product</h1>
+                <h1 className="text-2xl font-bold">Edit Product</h1>
                 <p className="text-sm text-muted-foreground">
                   Step {currentStep + 1} of {formSteps.length}
                 </p>
@@ -954,7 +1153,7 @@ export default function AddProduct() {
             </div>
             <div className="flex items-center gap-2">
               <Eye className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Preview available</span>
+              <span className="text-sm text-muted-foreground">Live preview</span>
             </div>
           </div>
 
@@ -1029,14 +1228,17 @@ export default function AddProduct() {
                     </Button>
 
                     {currentStep === formSteps.length - 1 ? (
-                      <Button type="submit" disabled={isSubmitting} className="h-11 min-w-[120px]">
+                      <Button type="submit" disabled={isSubmitting} className="h-11 min-w-[140px]">
                         {isSubmitting ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Adding...
+                            Updating...
                           </>
                         ) : (
-                          "Add Product"
+                          <>
+                            <Save className="mr-2 h-4 w-4" />
+                            Update Product
+                          </>
                         )}
                       </Button>
                     ) : (
@@ -1058,15 +1260,19 @@ export default function AddProduct() {
                   <Eye className="h-5 w-5" />
                   Live Preview
                 </CardTitle>
-                <CardDescription>See how your product will appear to customers</CardDescription>
+                <CardDescription>See how your updated product will appear</CardDescription>
               </CardHeader>
 
               <CardContent className="space-y-4">
                 {/* Product Image */}
                 <div className="aspect-square rounded-lg overflow-hidden border bg-gray-50">
-                  {selectedImages.length > 0 ? (
+                  {existingImages.length > 0 || selectedImages.length > 0 ? (
                     <img
-                      src={URL.createObjectURL(selectedImages[0]) || "/placeholder.svg"}
+                      src={
+                        selectedImages.length > 0
+                          ? URL.createObjectURL(selectedImages[0])
+                          : existingImages[0] || "/placeholder.svg"
+                      }
                       alt="Product preview"
                       className="object-cover w-full h-full"
                     />
