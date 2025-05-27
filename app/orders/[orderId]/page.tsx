@@ -3,7 +3,7 @@ import OrderDetailClient from "./OrderDetailClient";
 
 export default function OrderDetailPage({
   params,
- 
+
 }: {
   params: { orderId: string };
 }) {
